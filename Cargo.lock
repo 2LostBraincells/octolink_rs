@@ -583,7 +583,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "octolink_rs"
+name = "octoprint_rs"
 version = "0.1.0"
 dependencies = [
  "mockito",
