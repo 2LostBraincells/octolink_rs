@@ -1,5 +1,4 @@
-use std::error::Error;
-
+use std::{error::Error, time::Duration};
 use reqwest::Client;
 
 pub mod types;
@@ -19,7 +18,7 @@ pub struct PrinterBuilder {
 }
 
 impl PrinterBuilder {
-    pub fn new<P: ToString, P2: ToString>(api_key: P, address: P2) -> Self {
+    pub fn new<P: ToString, P2: ToString>(address: P2, api_key: P) -> Self {
         Self {
             address: address.to_string(),
             port: 80,
@@ -47,14 +46,22 @@ impl PrinterBuilder {
 }
 
 impl Printer {
+    /// Returns a struct representing the current api version.
     pub async fn get_api_version(&self) -> Result<types::ApiVersion, Box<dyn Error>> {
         let url = format!("http://{}:{}/api/version", self.address, self.port);
+        
+        dbg!(&url);
+
         let res = self
             .client
             .get(&url)
             .header("X-Api-Key", &self.api_key)
+            .timeout(Duration::from_secs(2))
             .send()
             .await?;
+
+        dbg!(&res);
+
         let body = res.json::<types::ApiVersion>().await?;
 
         Ok(body)

@@ -6,9 +6,9 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ApiVersion {
-    api: String,
-    server: String,
-    text: String,
+    pub api: String,
+    pub server: String,
+    pub text: String,
 }
 
 //
@@ -35,7 +35,7 @@ pub struct PrinterConnectionStateCurrent {
 pub struct PrinterConnectionStateOptions {
     ports: Vec<String>,
     baudrates: Vec<u32>,
-    #[serde(rename = "printerProfile")]
+    #[serde(rename = "printerProfiles")]
     printer_profiles: Vec<PrinterProfile>,
 }
 
