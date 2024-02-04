@@ -18,6 +18,8 @@ pub struct PrinterBuilder {
 }
 
 impl PrinterBuilder {
+    /// Creates a new `PrinterBuilder` from an `address` and an `api_key`.
+    /// `port` can be set with the [`port()`](#method.port) method and efaults to `80`.
     pub fn new<P: ToString, P2: ToString>(address: P2, api_key: P) -> Self {
         Self {
             address: address.to_string(),
@@ -27,14 +29,14 @@ impl PrinterBuilder {
         }
     }
 
-    /// Set the port of the printer
-    /// If this is not set, it will default to 80
+    /// Set the `port` of the printer
+    /// If this is not set, it will default to `80`
     pub fn port(mut self, port: u16) -> Self {
         self.port = port;
         self
     }
 
-    /// Build the printer struct
+    /// Build the `Printer` struct
     pub fn build(self) -> Printer {
         Printer {
             address: self.address,
