@@ -1,7 +1,5 @@
-use reqwest::{Body, Client};
+use reqwest::{Client, StatusCode};
 use std::{error::Error, time::Duration};
-use tokio::fs::File;
-use tokio_util::codec::{BytesCodec, FramedRead};
 
 pub mod types;
 
@@ -89,7 +87,7 @@ impl Printer {
     /// Set the connection settings of the printer
     pub async fn set_connection(
         &self,
-        connection: types::PrinterConnectionCommand,
+        connection: types::ConnectionCommandDescriptor,
     ) -> Result<(), Box<dyn Error>> {
         let url = format!("http://{}:{}/api/connection", self.address, self.port);
         let res = self
@@ -107,82 +105,43 @@ impl Printer {
         Ok(())
     }
 
-    /// Will get all printer files and folders from either local storage
-    /// or sd card as specified
-    pub async fn get_location(
+    /// Will get the printer files and folders from the specified folder
+    ///
+    /// # Arguments
+    ///
+    /// * `files_descriptor` - A struct containing the location of the files and if the request should be recursive
+    ///     * `location` - The location of the files, either `Root`, `Local` or `Sdcard`
+    ///     * `force` - If the request should force the printer to refresh the cache
+    ///     * `recursive` - If the request should be recursive
+    pub async fn get_files(
         &self,
-        location: types::FileLocation,
+        files_descriptor: types::FilesFetchDescriptor,
     ) -> Result<types::printer_files::Files, Box<dyn Error>> {
-        let url = format!(
-            "http://{}:{}/api/files/{}",
-            self.address,
-            self.port,
-            location.to_string()
-        );
-        let res = self
-            .client
-            .get(&url)
-            .header("X-Api-Key", &self.api_key)
-            .send()
-            .await?;
-        let body = res.json::<types::printer_files::Files>().await?;
+        let path = match files_descriptor.location {
+            types::FilesLocation::Root => "",
+            types::FilesLocation::Local => "/local",
+            types::FilesLocation::Sdcard => "/sdcard",
+        };
 
-        Ok(body)
-    }
-
-    /// Will get all printer files and folders recursively from either local storage
-    /// or sd card as specified
-    pub async fn get_location_recursive(
-        &self,
-        location: types::FileLocation,
-    ) -> Result<types::printer_files::Files, Box<dyn Error>> {
-        let url = format!(
-            "http://{}:{}/api/files/{}?recursive=true",
-            self.address,
-            self.port,
-            location.to_string()
-        );
-        let res = self
-            .client
-            .get(&url)
-            .header("X-Api-Key", &self.api_key)
-            .send()
-            .await?;
-        let body = res.json::<types::printer_files::Files>().await?;
-
-        Ok(body)
-    }
-
-    /// Will get the printer files and folders in the root directory
-    pub async fn get_files(&self) -> Result<types::printer_files::Files, Box<dyn Error>> {
-        let url = format!("http://{}:{}/api/files", self.address, self.port);
-        let res = self
-            .client
-            .get(&url)
-            .header("X-Api-Key", &self.api_key)
-            .send()
-            .await?;
-
-        let text = res.text().await?;
-        let result = &mut serde_json::Deserializer::from_str(text.as_str());
-        let deserialized = serde_path_to_error::deserialize(result);
-
-        // TODO Error Handling
-        match deserialized {
-            Err(err) => {
-                let path = err.path().to_string();
-                panic!("Error at: {path}\n{err}");
+        let query_params = if files_descriptor.force {
+            if files_descriptor.recursive {
+                "?force=true&recursive=true"
+            } else {
+                "?force=true"
             }
-            Ok(x) => Ok(x),
-        }
-    }
+        } else if files_descriptor.recursive {
+            "?recursive=true"
+        } else {
+            ""
+        };
 
-    /// Will get all printer files and folders recursively
-    pub async fn get_files_recursive(&self) -> Result<types::printer_files::Files, Box<dyn Error>> {
         let url = format!(
-            "http://{}:{}/api/files?recursive=true",
-            self.address, self.port
+            "http://{}:{}/api/files{}{}",
+            self.address, self.port, path, query_params
         );
+
+        dbg!(&url);
+
         let res = self
             .client
             .get(&url)
@@ -208,18 +167,47 @@ impl Printer {
     // TODO Make file uploads work
     //
 
+    /// Gets a single file or folder from the printer
+    ///
+    /// # Arguments
+    ///
+    /// * `file_descriptor` - A struct containing the location of the file and if the request should be recursive
+    ///    * `location` - The location of the file, either `Local` or `Sdcard`
+    ///    * `path` - The location of the file
+    ///    * `force` - If the request should force the printer to refresh the cache
+    ///    * `recursive` - If the request should be recursive
     pub async fn get_file(
         &self,
-        location: types::FileLocation,
-        path: &str,
-    ) -> Result<types::printer_files::Files, Box<dyn Error>> {
+        file_descriptor: types::FileFetchDescriptor,
+    ) -> Result<types::printer_files::Entry, Box<dyn Error>> {
+        let location = match file_descriptor.location {
+            types::FileLocation::Local => "local/",
+            types::FileLocation::Sdcard => "sdcard/",
+        };
+
+        let path = file_descriptor
+            .path
+            .strip_prefix('/')
+            .unwrap_or(&file_descriptor.path);
+
+        let query_params = if file_descriptor.force {
+            if file_descriptor.recursive {
+                "?force=true&recursive=true"
+            } else {
+                "?force=true"
+            }
+        } else if file_descriptor.recursive {
+            "?recursive=true"
+        } else {
+            ""
+        };
+
         let url = format!(
-            "http://{}:{}/api/files/{}/{}",
-            self.address,
-            self.port,
-            location.to_string(),
-            path
+            "http://{}:{}/api/files/{}{}{}",
+            self.address, self.port, location, path, query_params,
         );
+
+        dbg!(&url);
 
         let res = self
             .client
@@ -227,6 +215,13 @@ impl Printer {
             .header("X-Api-Key", &self.api_key)
             .send()
             .await?;
+
+        match res.status() {
+            StatusCode::NOT_FOUND => {
+                panic!("File couldnt be found");
+            }
+            _ => {}
+        }
 
         let text = res.text().await?;
         let result = &mut serde_json::Deserializer::from_str(text.as_str());
@@ -238,7 +233,9 @@ impl Printer {
                 let path = err.path().to_string();
                 panic!("Error at: {path}\n{err}");
             }
-            Ok(x) => Ok(x)
+            Ok(x) => Ok(x),
         }
     }
+
+    
 }

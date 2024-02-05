@@ -50,9 +50,9 @@ pub struct PrinterProfile {
 //
 
 /// This enum is used to model the connection commands that can be sent to the printer.
-pub enum PrinterConnectionCommand {
+pub enum ConnectionCommandDescriptor {
     /// Run [`get_connection`](#method.get_connection) to get the available values 
-    /// for `port`, `baud_rade` and `printer_profile`
+    /// for `port`, `baud_rate` and `printer_profile`
     ///
     /// `port`: The port to connect to.
     /// `baudrate`: The baudrate to connect at.
@@ -81,11 +81,11 @@ pub struct PrinterConnectionPost {
     autoconnect: Option<bool>,
 }
 
-impl PrinterConnectionCommand {
+impl ConnectionCommandDescriptor {
     /// Will convert the enum into a struct that can be deserialized to json and sent to the printer.
     pub fn to_post(self) -> PrinterConnectionPost {
         match self {
-            PrinterConnectionCommand::Connect {
+            ConnectionCommandDescriptor::Connect {
                 port,
                 baudrate,
                 printer_profile,
@@ -99,7 +99,7 @@ impl PrinterConnectionCommand {
                 save: Some(save),
                 autoconnect: Some(autoconnect),
             },
-            PrinterConnectionCommand::Disconnect => PrinterConnectionPost {
+            ConnectionCommandDescriptor::Disconnect => PrinterConnectionPost {
                 command: "disconnect".to_string(),
                 port: None,
                 baudrate: None,
@@ -107,7 +107,7 @@ impl PrinterConnectionCommand {
                 save: None,
                 autoconnect: None,
             },
-            PrinterConnectionCommand::FakeAck => PrinterConnectionPost {
+            ConnectionCommandDescriptor::FakeAck => PrinterConnectionPost {
                 command: "fake_ack".to_string(),
                 port: None,
                 baudrate: None,
@@ -123,18 +123,28 @@ impl PrinterConnectionCommand {
 // GET PRINTER FILES
 //
 
-pub enum FileLocation {
+pub enum FilesLocation {
+    Root,
     Local,
-    SdCard
+    Sdcard,
 }
 
-impl ToString for FileLocation {
-    fn to_string(&self) -> String {
-        match self {
-            Self::SdCard => "sdcard".to_string(),
-            Self::Local => "local".to_string(),
-        }
-    }
+pub enum FileLocation {
+    Local,
+    Sdcard,
+}
+
+pub struct FilesFetchDescriptor {
+    pub location: FilesLocation,
+    pub recursive: bool,
+    pub force: bool,
+}
+
+pub struct FileFetchDescriptor {
+    pub location: FileLocation,
+    pub path: String,
+    pub recursive: bool,
+    pub force: bool,
 }
 
 pub mod printer_files {
@@ -156,7 +166,7 @@ pub mod printer_files {
         #[serde(alias = "model")]
         File {
             name: String,
-            path: String,
+            path: Option<String>,
             #[serde(default)]
             #[serde(rename = "typePath")]
             type_path: Vec<String>,

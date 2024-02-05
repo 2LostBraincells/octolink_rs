@@ -3,7 +3,8 @@ pub struct MockFrame {
     pub mock: Option<mockito::Mock>,
     pub address: String,
     pub port: u16,
-    pub api_key: String, }
+    pub api_key: String,
+}
 
 /// Creates the base for a mock server, parsing the given url and returning the server, address, port and api key
 ///
@@ -29,7 +30,7 @@ fn mock_base() -> MockFrame {
     let api_key = "1234567890".to_string();
 
     dbg!(&address, &port);
-MockFrame {
+    MockFrame {
         server,
         address,
         port,
@@ -97,27 +98,29 @@ pub fn mock_get_api_connection() -> MockFrame {
 pub fn mock_post_api_connection() -> MockFrame {
     let mut server = mock_base();
 
-    let mock = Some(server.server
-        .mock("POST", "/api/connection")
-        .match_header("X-Api-Key", server.api_key.as_str())
-        .with_status(204)
-        .create());
+    let mock = Some(
+        server
+            .server
+            .mock("POST", "/api/connection")
+            .match_header("X-Api-Key", server.api_key.as_str())
+            .with_status(204)
+            .create(),
+    );
 
-    MockFrame {
-        mock,
-        ..server
-    }
+    MockFrame { mock, ..server }
 }
 
 pub fn mock_get_api_files() -> MockFrame {
     let mut server = mock_base();
 
-    let mock = Some(server.server
-        .mock("GET", "/api/files")
-        .match_header("X-Api-Key", server.api_key.as_str())
-        .with_status(200)
-        .with_body(
-        r#"{
+    let mock = Some(
+        server
+            .server
+            .mock("GET", "/api/files")
+            .match_header("X-Api-Key", server.api_key.as_str())
+            .with_status(200)
+            .with_body(
+                r#"{
   "files": [
     {
       "name": "whistle_v2.gcode",
@@ -197,24 +200,25 @@ pub fn mock_get_api_files() -> MockFrame {
     }
   ],
   "free": "3.2GB"
-}"#
-        )
-        .create());
+}"#,
+            )
+            .create(),
+    );
 
-    MockFrame {
-        mock,
-        ..server
-    }
+    MockFrame { mock, ..server }
 }
 
 pub fn mock_get_api_files_q_recursive() -> MockFrame {
     let mut server = mock_base();
 
-    let mock = Some(server.server.mock("GET", "/api/files?recursive=true")
-        .match_header("X-Api-Key", server.api_key.as_str())
-        .with_status(200)
-        .with_body(
-        r#"{
+    let mock = Some(
+        server
+            .server
+            .mock("GET", "/api/files?recursive=true")
+            .match_header("X-Api-Key", server.api_key.as_str())
+            .with_status(200)
+            .with_body(
+                r#"{
   "files": [
     {
       "name": "whistle_v2.gcode",
@@ -309,23 +313,25 @@ pub fn mock_get_api_files_q_recursive() -> MockFrame {
     }
   ],
   "free": "3.2GB"
-}"#
+}"#,
             )
-        .create());
+            .create(),
+    );
 
-    MockFrame {
-        mock,
-        ..server
-    }
+    MockFrame { mock, ..server }
 }
 
 pub fn mock_get_api_files_local() -> MockFrame {
     let mut server = mock_base();
 
-    let mock = Some(server.server.mock("GET", "/api/files/local")
-        .match_header("X-Api-Key", server.api_key.as_str())
-        .with_status(200)
-        .with_body(r#"{
+    let mock = Some(
+        server
+            .server
+            .mock("GET", "/api/files/local")
+            .match_header("X-Api-Key", server.api_key.as_str())
+            .with_status(200)
+            .with_body(
+                r#"{
   "files": [
     {
       "name": "whistle_v2.gcode",
@@ -359,11 +365,55 @@ pub fn mock_get_api_files_local() -> MockFrame {
   ],
   "free": "3.2GB"
 }
-                   "#)
-        .create());
+                   "#,
+            )
+            .create(),
+    );
 
-    MockFrame {
-        mock,
-        ..server
+    MockFrame { mock, ..server }
+}
+
+pub fn mock_get_api_files_local_gcode_whistle() -> MockFrame {
+    let mut server = mock_base();
+
+    let mock = Some(
+        server
+            .server
+            .mock("GET", "/api/files/local/gcode/whistle/whistle_v2.gcode")
+            .match_header("X-Api-Key", server.api_key.as_str())
+            .with_status(200)
+            .with_body(
+                r#"
+{
+  "name": "whistle_v2.gcode",
+  "type": "machinecode",
+  "size": 1468987,
+  "date": 1378847754,
+  "origin": "local",
+  "refs": {
+    "resource": "http://example.com/api/files/local/whistle_v2.gcode",
+    "download": "http://example.com/downloads/files/local/whistle_v2.gcode"
+  },
+  "gcodeAnalysis": {
+    "estimatedPrintTime": 1188,
+    "filament": {
+      "length": 810,
+      "volume": 5.36
     }
+  },
+  "print": {
+    "failure": 4,
+    "success": 23,
+    "last": {
+      "date": 1387144346,
+      "success": true
+    }
+  }
+}
+            "#,
+            )
+            .create(),
+    );
+
+    MockFrame { mock, ..server }
 }
