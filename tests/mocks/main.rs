@@ -58,7 +58,7 @@ async fn set_connection() {
 }
 
 #[test]
-async fn get_files() {
+async fn get_location() {
     let mut mock = mock_get_api_files();
 
     let mut printer = PrinterBuilder::new(mock.address, mock.api_key)
@@ -69,5 +69,20 @@ async fn get_files() {
 
     dbg!(root_files);
 
-    panic!();
+    mock.mock.unwrap().assert();
+}
+
+#[test]
+async fn get_location_recursive() {
+    let mock = mock_get_api_files_q_recursive();
+
+    let mut printer = PrinterBuilder::new(mock.address, mock.api_key)
+        .port(mock.port)
+        .build();
+
+    let files_recursive = printer.get_files_recursive().await.unwrap();
+
+    dbg!(files_recursive);
+
+    mock.mock.unwrap().assert();
 }

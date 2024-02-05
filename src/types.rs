@@ -51,9 +51,12 @@ pub struct PrinterProfile {
 
 /// This enum is used to model the connection commands that can be sent to the printer.
 pub enum PrinterConnectionCommand {
-    /// `port`: The port to connect to. Available ports can be gotten by running [`get_connection`]
-    /// `baudrate`: The baudrate to connect at. Available baudrates can be gotten by running [`get_connection`]
-    /// `printer_profile`: The printer profile to use. Available printer profiles can be gotten by running [`get_connection`]
+    /// Run [`get_connection`](#method.get_connection) to get the available values 
+    /// for `port`, `baud_rade` and `printer_profile`
+    ///
+    /// `port`: The port to connect to.
+    /// `baudrate`: The baudrate to connect at.
+    /// `printer_profile`: The printer profile to use.
     /// `save`: Whether or not to save the connection settings as the new preference.
     /// `autoconnect`: Whether or not to automatically connect to the printer on server startup.
     Connect {
@@ -120,6 +123,20 @@ impl PrinterConnectionCommand {
 // GET PRINTER FILES
 //
 
+pub enum FileLocation {
+    Local,
+    SdCard
+}
+
+impl ToString for FileLocation {
+    fn to_string(&self) -> String {
+        match self {
+            Self::SdCard => "sdcard".to_string(),
+            Self::Local => "local".to_string(),
+        }
+    }
+}
+
 pub mod printer_files {
     use std::collections::HashMap;
     use serde::{Deserialize, Serialize};
@@ -127,41 +144,43 @@ pub mod printer_files {
     /// This is the struct that is returned when getting the files from the printer.
     #[derive(Serialize, Deserialize, Debug)]
     pub struct Files {
-        files: Vec<File>,
-        free: u64,
-    }
-
-    #[derive(Serialize, Deserialize, Debug)]
-    pub struct File {
-        name: String,
-        display: String, path: String,
-        #[serde(rename = "type")]
-        type_: String,
-        #[serde(rename = "typePath")]
-        type_path: Vec<String>,
-        type_fields: FileType,
+        #[serde(default)]
+        files: Vec<Entry>,
+        free: String,
     }
 
     #[derive(Serialize, Deserialize, Debug)]
     #[serde(tag = "type")]
-    pub enum FileType {
-        #[serde(rename = "folder")]
-        Folder {
-            children: Vec<File>,
-            size: Option<u64>,
-        },
-        #[serde(rename = "file")]
+    pub enum Entry {
+        #[serde(alias = "machinecode")]
+        #[serde(alias = "model")]
         File {
+            name: String,
+            path: String,
+            #[serde(default)]
+            #[serde(rename = "typePath")]
+            type_path: Vec<String>,
+            origin: String,
             hash: Option<String>,
             size: Option<u64>,
             date: Option<u64>,
-            origin: String,
             refs: Option<Refs>,
             #[serde(rename = "gcodeAnalysis")]
             gcode_analysis: Option<GcodeAnalysis>,
-            prints: Option<PrintHistory>,
+            print: Option<PrintHistory>,
             statistics: Option<Statistics>,
         },
+        #[serde(alias = "folder")]
+        Folder {
+            name: String,
+            path: String,
+            #[serde(default)]
+            #[serde(rename = "typePath")]
+            type_path: Vec<String>,
+            size: Option<u64>,
+            #[serde(default)]
+            children: Vec<Entry>,
+        }
     }
 
     #[derive(Serialize, Deserialize, Debug)]
@@ -175,7 +194,7 @@ pub mod printer_files {
     pub struct GcodeAnalysis {
         #[serde(rename = "estimatedPrintTime")]
         estimated_print_time: Option<f32>,
-        filament: Option<Vec<GCodeAnalysisTools>>,
+        filament: Option<GCodeAnalysisTools>,
         dimensions: Option<GCodeAnalysisDimensions>,
         printing_area: Option<GCodeAnalysisArea>,
         travel_area: Option<GCodeAnalysisArea>,
@@ -225,16 +244,14 @@ pub mod printer_files {
     pub struct PrintHistoryLast {
         date: u64,
         #[serde(rename = "printTime")]
-        print_time: f32,
+        print_time: Option<f32>,
         success: bool,
     }
 
     #[derive(Serialize, Deserialize, Debug)]
     pub struct Statistics {
-        #[serde(flatten)]
         #[serde(rename = "averagePrintTime")]
         average_print_time: HashMap<String, f32>,
-        #[serde(flatten)]
         #[serde(rename = "lastPrintTime")]
         last_print_time: HashMap<String, f32>,
     }

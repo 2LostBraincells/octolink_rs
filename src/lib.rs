@@ -1,5 +1,7 @@
+use reqwest::{Body, Client};
 use std::{error::Error, time::Duration};
-use reqwest::Client;
+use tokio::fs::File;
+use tokio_util::codec::{BytesCodec, FramedRead};
 
 pub mod types;
 
@@ -51,7 +53,7 @@ impl Printer {
     /// Returns a struct representing the current api version.
     pub async fn get_api_version(&self) -> Result<types::ApiVersion, Box<dyn Error>> {
         let url = format!("http://{}:{}/api/version", self.address, self.port);
-        
+
         dbg!(&url);
 
         let res = self
@@ -105,14 +107,17 @@ impl Printer {
         Ok(())
     }
 
-    /// Will get the printer files and folders in the specified directory
-    pub async fn get_file(
+    /// Will get all printer files and folders from either local storage
+    /// or sd card as specified
+    pub async fn get_location(
         &self,
-        location: &str,
+        location: types::FileLocation,
     ) -> Result<types::printer_files::Files, Box<dyn Error>> {
         let url = format!(
             "http://{}:{}/api/files/{}",
-            self.address, self.port, location
+            self.address,
+            self.port,
+            location.to_string()
         );
         let res = self
             .client
@@ -125,14 +130,17 @@ impl Printer {
         Ok(body)
     }
 
-    /// Will get all printer files and folders recursively from the specified directory
-    pub async fn get_file_recursive(
+    /// Will get all printer files and folders recursively from either local storage
+    /// or sd card as specified
+    pub async fn get_location_recursive(
         &self,
-        location: &str,
+        location: types::FileLocation,
     ) -> Result<types::printer_files::Files, Box<dyn Error>> {
         let url = format!(
             "http://{}:{}/api/files/{}?recursive=true",
-            self.address, self.port, location
+            self.address,
+            self.port,
+            location.to_string()
         );
         let res = self
             .client
@@ -154,24 +162,83 @@ impl Printer {
             .header("X-Api-Key", &self.api_key)
             .send()
             .await?;
-        let body = res.json::<types::printer_files::Files>().await?;
 
-        Ok(body)
+        let text = res.text().await?;
+        let result = &mut serde_json::Deserializer::from_str(text.as_str());
+        let deserialized = serde_path_to_error::deserialize(result);
+
+        // TODO Error Handling
+        match deserialized {
+            Err(err) => {
+                let path = err.path().to_string();
+                panic!("Error at: {path}\n{err}");
+            }
+            Ok(x) => Ok(x),
+        }
     }
 
     /// Will get all printer files and folders recursively
-    pub async fn get_files_recursive(
-        &self,
-    ) -> Result<types::printer_files::Files, Box<dyn Error>> {
-        let url = format!("http://{}:{}/api/files?recursive=true", self.address, self.port);
+    pub async fn get_files_recursive(&self) -> Result<types::printer_files::Files, Box<dyn Error>> {
+        let url = format!(
+            "http://{}:{}/api/files?recursive=true",
+            self.address, self.port
+        );
         let res = self
             .client
             .get(&url)
             .header("X-Api-Key", &self.api_key)
             .send()
             .await?;
-        let body = res.json::<types::printer_files::Files>().await?;
 
-        Ok(body)
+        let text = res.text().await?;
+        let result = &mut serde_json::Deserializer::from_str(text.as_str());
+        let deserialized = serde_path_to_error::deserialize(result);
+
+        // TODO Error Handling
+        match deserialized {
+            Err(err) => {
+                let path = err.path().to_string();
+                panic!("Error at: {path}\n{err}");
+            }
+            Ok(x) => Ok(x),
+        }
+    }
+
+    //
+    // TODO Make file uploads work
+    //
+
+    pub async fn get_file(
+        &self,
+        location: types::FileLocation,
+        path: &str,
+    ) -> Result<types::printer_files::Files, Box<dyn Error>> {
+        let url = format!(
+            "http://{}:{}/api/files/{}/{}",
+            self.address,
+            self.port,
+            location.to_string(),
+            path
+        );
+
+        let res = self
+            .client
+            .get(&url)
+            .header("X-Api-Key", &self.api_key)
+            .send()
+            .await?;
+
+        let text = res.text().await?;
+        let result = &mut serde_json::Deserializer::from_str(text.as_str());
+        let deseialized = serde_path_to_error::deserialize(result);
+
+        // TODO Error Handling
+        match deseialized {
+            Err(err) => {
+                let path = err.path().to_string();
+                panic!("Error at: {path}\n{err}");
+            }
+            Ok(x) => Ok(x)
+        }
     }
 }

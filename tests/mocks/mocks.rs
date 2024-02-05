@@ -3,8 +3,7 @@ pub struct MockFrame {
     pub mock: Option<mockito::Mock>,
     pub address: String,
     pub port: u16,
-    pub api_key: String,
-}
+    pub api_key: String, }
 
 /// Creates the base for a mock server, parsing the given url and returning the server, address, port and api key
 ///
@@ -30,8 +29,7 @@ fn mock_base() -> MockFrame {
     let api_key = "1234567890".to_string();
 
     dbg!(&address, &port);
-
-    MockFrame {
+MockFrame {
         server,
         address,
         port,
@@ -209,7 +207,7 @@ pub fn mock_get_api_files() -> MockFrame {
     }
 }
 
-pub fn mock_get_api_files_recursive() -> MockFrame {
+pub fn mock_get_api_files_q_recursive() -> MockFrame {
     let mut server = mock_base();
 
     let mock = Some(server.server.mock("GET", "/api/files?recursive=true")
@@ -296,23 +294,72 @@ pub fn mock_get_api_files_recursive() -> MockFrame {
                 "resource": "http://example.com/api/files/local/folderA/subfolder/test2.gcode",
                 "download": "http://example.com/downloads/files/local/folderA/subfolder/test2.gcode"
               }
-            },
+            }
           ],
           "size": 100,
           "refs": {
-            "resource": "http://example.com/api/files/local/folderA/subfolder",
+            "resource": "http://example.com/api/files/local/folderA/subfolder"
           }
         }
       ],
       "size": 1334,
       "refs": {
-        "resource": "http://example.com/api/files/local/folderA",
+        "resource": "http://example.com/api/files/local/folderA"
       }
     }
   ],
   "free": "3.2GB"
 }"#
             )
+        .create());
+
+    MockFrame {
+        mock,
+        ..server
+    }
+}
+
+pub fn mock_get_api_files_local() -> MockFrame {
+    let mut server = mock_base();
+
+    let mock = Some(server.server.mock("GET", "/api/files/local")
+        .match_header("X-Api-Key", server.api_key.as_str())
+        .with_status(200)
+        .with_body(r#"{
+  "files": [
+    {
+      "name": "whistle_v2.gcode",
+      "path": "whistle_v2.gcode",
+      "type": "machinecode",
+      "typePath": ["machinecode", "gcode"],
+      "hash": "...",
+      "size": 1468987,
+      "date": 1378847754,
+      "origin": "local",
+      "refs": {
+        "resource": "http://example.com/api/files/local/whistle_v2.gcode",
+        "download": "http://example.com/downloads/files/local/whistle_v2.gcode"
+      },
+      "gcodeAnalysis": {
+        "estimatedPrintTime": 1188,
+        "filament": {
+          "length": 810,
+          "volume": 5.36
+        }
+      },
+      "print": {
+        "failure": 4,
+        "success": 23,
+        "last": {
+          "date": 1387144346,
+          "success": true
+        }
+      }
+    }
+  ],
+  "free": "3.2GB"
+}
+                   "#)
         .create());
 
     MockFrame {
