@@ -4,6 +4,8 @@ use tokio::test;
 mod mocks;
 use mocks::*;
 
+use octoprint_rs::errors::{FileRequestError, InformationRequestError, SetConnectionError};
+
 #[test]
 async fn get_api_version() {
     #[allow(unused)]
@@ -108,7 +110,7 @@ async fn get_location_recursive() {
 
 #[test]
 async fn get_file() {
-    let mock = mock_get_api_files_local_gcode_whistle();
+    let mock = mock_get_api_files_local_folder_printed();
 
     let printer = PrinterBuilder::new(mock.address, mock.api_key)
         .port(mock.port)
@@ -117,7 +119,7 @@ async fn get_file() {
     let file = printer
         .get_file(types::FileFetchDescriptor {
             location: types::FileLocation::Local,
-            path: "/gcode/whistle/whistle_v2.gcode".to_string(),
+            path: "/folder/printed.gcode".to_string(),
             recursive: false,
             force: false,
         })

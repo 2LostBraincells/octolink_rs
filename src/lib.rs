@@ -1,6 +1,9 @@
-use errors::{InformationRequestError, SetConnectionError, FileRequestError};
+use errors::{
+    FileCommandError, FileDeletionError, FileRequestError, InformationRequestError,
+    JobCommandError, SetConnectionError,
+};
 use reqwest::{Client, StatusCode};
-use std::error::Error;
+use types::JobCommand;
 
 pub mod errors;
 pub mod types;
@@ -151,10 +154,10 @@ impl Printer {
         match res {
             Err(e) => Err(SetConnectionError::ReqwestError(e)),
             Ok(x) if x.status() != StatusCode::OK => {
-                    let text = x.text().await.unwrap();
-                    Err(SetConnectionError::InvalidRequest(text))
-            },
-            _ => Ok(()), 
+                let text = x.text().await.unwrap();
+                Err(SetConnectionError::BadRequest(text))
+            }
+            _ => Ok(()),
         }
     }
 
@@ -213,7 +216,7 @@ impl Printer {
             Ok(x) => {
                 if x.status() != StatusCode::OK {
                     let text = x.text().await.unwrap();
-                    return Err(FileRequestError::InvalidResponse(text))
+                    return Err(FileRequestError::InvalidResponse(text));
                 }
 
                 let text = x.text().await.unwrap();
@@ -240,7 +243,7 @@ impl Printer {
     ///    - `force` - If the request should force the printer to refresh the cache
     ///    - `recursive` - If the request should be recursive
     ///
-    /// # Errors 
+    /// # Errors
     ///
     /// `ReqwestError` - If the request fails
     /// `InvalidResponse` - If the response is invalid
@@ -249,15 +252,16 @@ impl Printer {
         &self,
         file_descriptor: types::FileFetchDescriptor,
     ) -> Result<types::printer_files::Entry, FileRequestError> {
-        let location = match file_descriptor.location {
+        let location = match file_descriptor.path.location {
             types::FileLocation::Local => "local/",
             types::FileLocation::Sdcard => "sdcard/",
         };
 
         let path = file_descriptor
             .path
+            .path
             .strip_prefix('/')
-            .unwrap_or(&file_descriptor.path);
+            .unwrap_or(&file_descriptor.path.path);
 
         let query_params = if file_descriptor.force {
             if file_descriptor.recursive {
@@ -290,7 +294,7 @@ impl Printer {
             Ok(x) => {
                 if x.status() == StatusCode::NOT_FOUND {
                     let text = x.text().await.unwrap();
-                    return Err(FileRequestError::NoFile(text))
+                    return Err(FileRequestError::NotFound(text));
                 }
 
                 let text = x.text().await.unwrap();
@@ -304,4 +308,215 @@ impl Printer {
             }
         }
     }
+
+    /// Will issue a file command to the printer.
+    /// This can either be `Select`, `Deselect`, `Move` or `Copy`.
+    ///
+    /// If you want to `select` a file, you need to specify weather you want to print it or not.
+    /// `deselect` does something but I'm not sure what.
+    ///
+    /// If you want to copy or move a file, you need to provide a `destination` path.
+    /// The `destination` path should be the full path will not include `"/local"` or `"/sdcard"` at the
+    /// start.
+    ///
+    /// # Errors
+    ///
+    /// If something goes wrong, it will return a `FileCommandError`
+    /// * `ReqwestError` - If the request fails
+    /// * `Conflict` - If the server responds with a `409` status code
+    /// * `BadRequest` - If the server responds with a `400` or `500` status code.
+    ///    Make sure to check your destination path.
+    ///
+    /// # Example
+    /// ```
+    /// # use octoprint_rs::types::FileCommandDescriptor;
+    /// # use octoprint_rs::types::FileCommand;
+    /// # use octoprint_rs::types::FileLocation;
+    /// # use octoprint_rs::types::PathDescriptor;
+    /// # use octoprint_rs::PrinterBuilder;
+    /// let printer = PrinterBuilder::new("localhost", "API_KEY")
+    ///     .port(5000)
+    ///     .build();   
+    ///
+    /// //Note that this will return a future that can be awaited.
+    /// printer.issue_file_command(FileCommandDescriptor {
+    ///     command: FileCommand::Copy {
+    ///         destination: "/folder".to_string()
+    ///     },
+    ///     path: PathDescriptor,
+    /// });
+    pub async fn issue_file_command(
+        &self,
+        command: types::FileCommandDescriptor,
+    ) -> Result<(), FileCommandError> {
+        let location = match command.path.location {
+            types::FileLocation::Local => "local/",
+            types::FileLocation::Sdcard => "sdcard/",
+        };
+
+        let path = command
+            .path
+            .path
+            .strip_prefix('/')
+            .unwrap_or(&command.path.path);
+
+        let url = format!(
+            "http://{}:{}/api/files/{}{}",
+            self.address, self.port, location, path
+        );
+
+        let res = self
+            .client
+            .post(&url)
+            .header("X-Api-Key", &self.api_key)
+            .json(&command.to_post())
+            .send()
+            .await;
+
+        match res {
+            Err(e) => Err(FileCommandError::ReqwestError(e)),
+            Ok(x) => match x.status() {
+                StatusCode::CREATED | StatusCode::NO_CONTENT => Ok(()),
+                StatusCode::BAD_REQUEST => {
+                    let text = x.text().await.unwrap();
+                    Err(FileCommandError::BadRequest(text))
+                }
+                StatusCode::INTERNAL_SERVER_ERROR => {
+                    let text = x.text().await.unwrap();
+                    Err(FileCommandError::BadRequest(text))
+                }
+                StatusCode::CONFLICT => {
+                    let text = x.text().await.unwrap();
+                    Err(FileCommandError::Conflict(text))
+                }
+                // Shouldnt be able to get here
+                _ => {
+                    let text = x.text().await.unwrap();
+                    panic!("wut: {}", text);
+                }
+            },
+        }
+    }
+
+    /// Deletes a file from the printer
+    pub async fn delete_file(&self, path: types::PathDescriptor) -> Result<(), FileDeletionError> {
+        let location = match path.location {
+            types::FileLocation::Local => "local/",
+            types::FileLocation::Sdcard => "sdcard/",
+        };
+
+        let path = path.path.strip_prefix('/').unwrap_or(&path.path);
+
+        let url = format!(
+            "http://{}:{}/api/files/{}{}",
+            self.address, self.port, location, path
+        );
+
+        let res = self
+            .client
+            .delete(&url)
+            .header("X-Api-Key", &self.api_key)
+            .send()
+            .await;
+
+        match res {
+            Err(e) => Err(FileDeletionError::ReqwestError(e)),
+            Ok(x) => match x.status() {
+                StatusCode::NO_CONTENT => Ok(()),
+                StatusCode::NOT_FOUND => {
+                    let text = x.text().await.unwrap();
+                    Err(FileDeletionError::NotFound(text))
+                }
+                StatusCode::CONFLICT => {
+                    let text = x.text().await.unwrap();
+                    Err(FileDeletionError::Conflict(text))
+                }
+                // Shouldnt be able to get here
+                _ => {
+                    let text = x.text().await.unwrap();
+                    panic!("wut: {}", text);
+                }
+            },
+        }
+    }
+
+    //
+    //  INFO: Job operations
+    //
+
+    /// Will issue a job command to the printer.
+    ///
+    /// # Arguments
+    ///
+    /// `command` - A [`JobCommand`] representing the command to issue
+    ///
+    /// # Errors
+    ///
+    /// If something goes wrong, it will return a [`JobCommandError`]
+    /// * `ReqwestError` - If the request fails
+    /// * `Conflict` - If the server responds with a `409` status code
+    /// This can happen if the printer is already printing and you try to start a new print
+    /// or delete the file its currently printing.
+    pub async fn issue_job_command(&self, command: JobCommand) -> Result<(), JobCommandError> {
+        let url = "/api/job";
+
+        let res = self
+            .client
+            .post(url)
+            .header("X-Api-Key", &self.api_key)
+            .json(&command.to_raw_command())
+            .send()
+            .await;
+
+        match res {
+            Err(e) => Err(JobCommandError::ReqwestError(e)),
+            Ok(x) => match x.status() {
+                StatusCode::NO_CONTENT => Ok(()),
+                StatusCode::CONFLICT => {
+                    let text = x.text().await.unwrap();
+                    Err(JobCommandError::Conflict(text))
+                }
+                // Shouldnt be able to get here
+                _ => {
+                    let text = x.text().await.unwrap();
+                    panic!("wut: {}", text);
+                }
+            },
+        }
+    }
+
+    /// Gets the current job information from the printer
+    ///
+    /// # Errors
+    ///
+    /// If there is an error, it will return a `InformationRequestError`
+    /// * `ReqwestError` - If the request fails
+    /// * `InvalidResponse` - If the response is invalid
+    /// This can happen if the wrapper is outdated and they changed something in the api. (cry about it)
+    pub async fn get_job(&self) -> Result<types::JobInformation, InformationRequestError> {
+        let url = "/api/job";
+
+        let res = self
+            .client
+            .get(url)
+            .header("X-Api-Key", &self.api_key)
+            .send()
+            .await;
+
+        match res {
+            Err(e) => Err(InformationRequestError::ReqwestError(e)),
+            Ok(x) => {
+                let text = x.text().await.unwrap();
+                let result = &mut serde_json::Deserializer::from_str(text.as_str());
+                let deserialized = serde_path_to_error::deserialize(result);
+
+                match deserialized {
+                    Err(e) => Err(InformationRequestError::InvalidResponse(e.to_string())),
+                    Ok(x) => Ok(x),
+                }
+            }
+        }
+    }
+
+    
 }

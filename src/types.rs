@@ -1,7 +1,44 @@
 use serde::{Deserialize, Serialize};
 
 //
-// API VERSION
+//  INFO: HELPER STRUCTS
+//
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Dimension {
+    #[serde(rename = "width")]
+    pub x: f32,
+    #[serde(rename = "height")]
+    pub y: f32,
+    #[serde(rename = "depth")]
+    pub z: f32,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Position {
+    pub x: f32,
+    pub y: f32,
+}
+
+pub struct PathDescriptor {
+    pub location: FileLocation,
+    pub path: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct FilamentTool {
+    pub length: f32,
+    pub volume: f32,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct FilamentToolOpt {
+    pub length: Option<f32>,
+    pub volume: Option<f32>,
+}
+
+//
+//  INFO: API VERSION
 //
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -12,10 +49,10 @@ pub struct ApiVersion {
 }
 
 //
-// PRINTER CONNECTION GET
+//  INFO: PRINTER CONNECTION GET
 //
 
-/// This is the struct 
+/// This is the struct
 #[derive(Serialize, Deserialize, Debug)]
 pub struct PrinterConnection {
     current: PrinterConnectionStateCurrent,
@@ -46,12 +83,12 @@ pub struct PrinterProfile {
 }
 
 //
-// PRINTER CONNECTION SET 
+//  INFO: PRINTER CONNECTION SET
 //
 
 /// This enum is used to model the connection commands that can be sent to the printer.
 pub enum ConnectionCommandDescriptor {
-    /// Run [`get_connection`](#method.get_connection) to get the available values 
+    /// Run [`get_connection`](#method.get_connection) to get the available values
     /// for `port`, `baud_rate` and `printer_profile`
     ///
     /// `port`: The port to connect to.
@@ -120,7 +157,68 @@ impl ConnectionCommandDescriptor {
 }
 
 //
-// GET PRINTER FILES
+//  INFO: PRINTER FILE COMMANDS
+//
+
+/// This struct is used to model the file commands that can be sent to the printer.
+/// Currently Slicing isnt supported.
+pub struct FileCommandDescriptor {
+    pub command: FileCommand,
+    pub path: PathDescriptor,
+}
+
+pub enum FileCommand {
+    /// `print`: Whether or not to print the file after selecting it.
+    Select {
+        print: bool,
+    },
+    Unselect,
+    /// `destination`: The destination to copy the file to.
+    Copy {
+        destination: String,
+    },
+    /// `destination`: The destination to move the file to.
+    Move {
+        destination: String,
+    },
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct RawFileCommandDescriptor {
+    command: String,
+    print: Option<bool>,
+    destination: Option<String>,
+}
+
+impl FileCommandDescriptor {
+    pub fn to_post(self) -> RawFileCommandDescriptor {
+        match self.command {
+            FileCommand::Select { print } => RawFileCommandDescriptor {
+                command: "select".to_string(),
+                print: Some(print),
+                destination: None,
+            },
+            FileCommand::Unselect => RawFileCommandDescriptor {
+                command: "unselect".to_string(),
+                print: None,
+                destination: None,
+            },
+            FileCommand::Copy { destination } => RawFileCommandDescriptor {
+                command: "copy".to_string(),
+                print: None,
+                destination: Some(destination),
+            },
+            FileCommand::Move { destination } => RawFileCommandDescriptor {
+                command: "move".to_string(),
+                print: None,
+                destination: Some(destination),
+            },
+        }
+    }
+}
+
+//
+//  INFO: GET PRINTER FILES
 //
 
 pub enum FilesLocation {
@@ -141,15 +239,16 @@ pub struct FilesFetchDescriptor {
 }
 
 pub struct FileFetchDescriptor {
-    pub location: FileLocation,
-    pub path: String,
+    pub path: PathDescriptor,
     pub recursive: bool,
     pub force: bool,
 }
 
 pub mod printer_files {
-    use std::collections::HashMap;
     use serde::{Deserialize, Serialize};
+    use std::collections::HashMap;
+
+    use super::{Dimension, FilamentTool};
 
     /// This is the struct that is returned when getting the files from the printer.
     #[derive(Serialize, Deserialize, Debug)]
@@ -195,7 +294,7 @@ pub mod printer_files {
             #[serde(rename = "typePath")]
             type_path: Vec<String>,
             size: Option<u64>,
-        }
+        },
     }
 
     #[derive(Serialize, Deserialize, Debug)]
@@ -209,21 +308,11 @@ pub mod printer_files {
     pub struct GcodeAnalysis {
         #[serde(rename = "estimatedPrintTime")]
         estimated_print_time: Option<f32>,
-        filament: Option<GCodeAnalysisTools>,
-        dimensions: Option<GCodeAnalysisDimensions>,
+        filament: Option<FilamentTool>,
+        dimensions: Option<Dimension>,
         printing_area: Option<GCodeAnalysisArea>,
         travel_area: Option<GCodeAnalysisArea>,
-        travel_dimensions: Option<GCodeAnalysisDimensions>,
-    }
-
-    #[derive(Serialize, Deserialize, Debug)]
-    pub struct GCodeAnalysisDimensions {
-        #[serde(rename = "width")]
-        x: f32,
-        #[serde(rename = "height")]
-        y: f32,
-        #[serde(rename = "depth")]
-        z: f32,
+        travel_dimensions: Option<Dimension>,
     }
 
     #[derive(Serialize, Deserialize, Debug)]
@@ -275,4 +364,88 @@ pub mod printer_files {
         #[serde(rename = "lastPrintTime")]
         last_print_time: HashMap<String, f32>,
     }
+}
+
+//
+//  INFO: PRINTER JOBS
+//
+
+pub enum JobCommand {
+    Start,
+    Cancel,
+    Pause,
+    Resume,
+    Toggle,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct RawJobCommand {
+    pub command: String,
+    pub action: Option<String>,
+}
+
+impl JobCommand {
+    pub fn to_raw_command(&self) -> RawJobCommand {
+        match self {
+            JobCommand::Start => RawJobCommand {
+                command: "start".to_string(),
+                action: None,
+            },
+            JobCommand::Cancel => RawJobCommand {
+                command: "cancel".to_string(),
+                action: None,
+            },
+            JobCommand::Pause => RawJobCommand {
+                command: "pause".to_string(),
+                action: Some("pause".to_string()),
+            },
+            JobCommand::Resume => RawJobCommand {
+                command: "pause".to_string(),
+                action: Some("resume".to_string()),
+            },
+            JobCommand::Toggle => RawJobCommand {
+                command: "pause".to_string(),
+                action: Some("toggle".to_string()),
+            },
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct JobInformation {
+    job: Job,
+    progress: JobProgress,
+    state: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Job {
+    #[serde(rename = "estimatedPrintTime")]
+    estimated_print_time: Option<f32>,
+    filament: FilamentToolOpt,
+    file: JobFile,
+    #[serde(rename = "lastPrintTime")]
+    last_print_time: Option<f32>,
+    user: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct JobFile {
+    date: Option<u64>,
+    name: Option<String>,
+    origin: Option<String>,
+    path: Option<String>,
+    size: Option<u64>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct JobProgress {
+    completion: Option<f32>,
+    filepos: Option<u64>,
+    #[serde(rename = "printTime")]
+    print_time: Option<u64>,
+    #[serde(rename = "printTimeLeft")]
+    print_time_left: Option<u64>,
+    #[serde(rename = "printTimeOrigin")]
+    print_time_origin: Option<String>,
 }

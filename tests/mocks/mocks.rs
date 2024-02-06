@@ -69,8 +69,7 @@ pub fn mock_get_api_connection() -> MockFrame {
             .server
             .mock("GET", "/api/connection")
             .match_header("X-Api-Key", server.api_key.as_str())
-            .with_status(200)
-            .with_body(
+            .with_status(200) .with_body(
                 r#"{
   "current": {
     "baudrate": null,
@@ -479,7 +478,7 @@ pub fn mock_get_api_files_local() -> MockFrame {
     MockFrame { mock, ..server }
 }
 
-pub fn mock_get_api_files_local_gcode_whistle() -> MockFrame {
+pub fn mock_get_api_files_local_folder_printed() -> MockFrame {
     let mut server = mock_base();
 
     let mock = Some(
