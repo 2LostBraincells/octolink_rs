@@ -1,0 +1,2 @@
+GET http://127.0.0.1:5000/api/files/local
+X-Api-Key: A4944682780A409786DC79A40A51D14C

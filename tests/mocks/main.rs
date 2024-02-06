@@ -15,8 +15,8 @@ async fn get_api_version() {
     let api_version = printer.get_api_version().await.unwrap();
 
     assert_eq!(api_version.api, "0.1".to_string());
-    assert_eq!(api_version.server, "1.3.10".to_string());
-    assert_eq!(api_version.text, "OctoPrint 1.3.10".to_string());
+    assert_eq!(api_version.server, "1.9.3".to_string());
+    assert_eq!(api_version.text, "OctoPrint 1.9.3".to_string());
 
     mock.mock.unwrap().assert()
 }

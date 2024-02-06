@@ -1,6 +1,8 @@
+use errors::{InformationRequestError, SetConnectionError, FileRequestError};
 use reqwest::{Client, StatusCode};
-use std::{error::Error, time::Duration};
+use std::error::Error;
 
+pub mod errors;
 pub mod types;
 
 pub struct Printer {
@@ -48,8 +50,18 @@ impl PrinterBuilder {
 }
 
 impl Printer {
+    //
+    //  INFO: General printer information
+    //
+
     /// Returns a struct representing the current api version.
-    pub async fn get_api_version(&self) -> Result<types::ApiVersion, Box<dyn Error>> {
+    ///
+    /// # Errors
+    ///
+    /// If there is an error, it will return a `InformationRequestError`
+    /// * `ReqwestError` - If the request fails
+    /// * `InvalidResponse` - If the response is invalid
+    pub async fn get_api_version(&self) -> Result<types::ApiVersion, InformationRequestError> {
         let url = format!("http://{}:{}/api/version", self.address, self.port);
 
         dbg!(&url);
@@ -58,37 +70,75 @@ impl Printer {
             .client
             .get(&url)
             .header("X-Api-Key", &self.api_key)
-            .timeout(Duration::from_secs(2))
             .send()
-            .await?;
+            .await;
 
-        dbg!(&res);
+        match res {
+            Err(e) => Err(InformationRequestError::ReqwestError(e)),
+            Ok(x) => {
+                dbg!(&x);
 
-        let body = res.json::<types::ApiVersion>().await?;
-
-        Ok(body)
+                let body = x.json::<types::ApiVersion>().await;
+                match body {
+                    Err(e) => Err(InformationRequestError::ReqwestError(e)),
+                    Ok(x) => Ok(x),
+                }
+            }
+        }
     }
+
+    //
+    //  INFO: Connection settings
+    //
 
     /// Returns a struct containing the current connection settings of the printer
     /// as well as the available printer settings
-    pub async fn get_connection(&self) -> Result<types::PrinterConnection, Box<dyn Error>> {
+    ///
+    /// # Errors
+    ///
+    /// If there is an error, it will return a `InformationRequestError`
+    /// * `ReqwestError` - If the request fails
+    /// * `InvalidResponse` - If the response is invalid
+    pub async fn get_connection(
+        &self,
+    ) -> Result<types::PrinterConnection, InformationRequestError> {
         let url = format!("http://{}:{}/api/connection", self.address, self.port);
         let res = self
             .client
             .get(&url)
             .header("X-Api-Key", &self.api_key)
             .send()
-            .await?;
-        let body = res.json::<types::PrinterConnection>().await?;
+            .await;
 
-        Ok(body)
+        match res {
+            Err(e) => Err(InformationRequestError::ReqwestError(e)),
+            Ok(x) => {
+                dbg!(&x);
+
+                let body = x.json::<types::PrinterConnection>().await;
+                match body {
+                    Err(e) => Err(InformationRequestError::ReqwestError(e)),
+                    Ok(x) => Ok(x),
+                }
+            }
+        }
     }
 
     /// Set the connection settings of the printer
+    ///
+    /// # Arguments
+    ///
+    /// Takes in a [`ConnectionCommandDescriptor`](types::ConnectionCommandDescriptor) and sends it to the printer in the form of json
+    ///
+    /// # Errors
+    ///
+    /// If the request fails, it will return a `SetConnectionError`
+    /// * `ReqwestError` - If the request fails
+    /// * `InvalidRequest` - If the request is invalid
     pub async fn set_connection(
         &self,
         connection: types::ConnectionCommandDescriptor,
-    ) -> Result<(), Box<dyn Error>> {
+    ) -> Result<(), SetConnectionError> {
         let url = format!("http://{}:{}/api/connection", self.address, self.port);
         let res = self
             .client
@@ -96,14 +146,21 @@ impl Printer {
             .header("X-Api-Key", &self.api_key)
             .json(&connection.to_post())
             .send()
-            .await?;
+            .await;
 
-        if res.status().is_client_error() {
-            return Err("Incorrect request body".into());
+        match res {
+            Err(e) => Err(SetConnectionError::ReqwestError(e)),
+            Ok(x) if x.status() != StatusCode::OK => {
+                    let text = x.text().await.unwrap();
+                    Err(SetConnectionError::InvalidRequest(text))
+            },
+            _ => Ok(()), 
         }
-
-        Ok(())
     }
+
+    //
+    //  NOTE: File operations
+    //
 
     /// Will get the printer files and folders from the specified folder
     ///
@@ -113,11 +170,13 @@ impl Printer {
     ///     * `location` - The location of the files, either `Root`, `Local` or `Sdcard`
     ///     * `force` - If the request should force the printer to refresh the cache
     ///     * `recursive` - If the request should be recursive
+    ///
+    /// # Errors
     pub async fn get_files(
         &self,
         files_descriptor: types::FilesFetchDescriptor,
-    ) -> Result<types::printer_files::Files, Box<dyn Error>> {
-        let path = match files_descriptor.location {
+    ) -> Result<types::printer_files::Files, FileRequestError> {
+        let location = match files_descriptor.location {
             types::FilesLocation::Root => "",
             types::FilesLocation::Local => "/local",
             types::FilesLocation::Sdcard => "/sdcard",
@@ -137,7 +196,7 @@ impl Printer {
 
         let url = format!(
             "http://{}:{}/api/files{}{}",
-            self.address, self.port, path, query_params
+            self.address, self.port, location, query_params
         );
 
         dbg!(&url);
@@ -147,39 +206,49 @@ impl Printer {
             .get(&url)
             .header("X-Api-Key", &self.api_key)
             .send()
-            .await?;
+            .await;
 
-        let text = res.text().await?;
-        let result = &mut serde_json::Deserializer::from_str(text.as_str());
-        let deserialized = serde_path_to_error::deserialize(result);
+        match res {
+            Err(e) => Err(FileRequestError::ReqwestError(e)),
+            Ok(x) => {
+                if x.status() != StatusCode::OK {
+                    let text = x.text().await.unwrap();
+                    return Err(FileRequestError::InvalidResponse(text))
+                }
 
-        // TODO Error Handling
-        match deserialized {
-            Err(err) => {
-                let path = err.path().to_string();
-                panic!("Error at: {path}\n{err}");
+                let text = x.text().await.unwrap();
+                let result = &mut serde_json::Deserializer::from_str(text.as_str());
+                let deserialized = serde_path_to_error::deserialize(result);
+
+                match deserialized {
+                    Err(err) => Err(FileRequestError::InvalidResponse(err.to_string())),
+                    Ok(x) => Ok(x),
+                }
             }
-            Ok(x) => Ok(x),
         }
     }
 
-    //
-    // TODO Make file uploads work
-    //
+    //  TODO: Make file uploads work
 
     /// Gets a single file or folder from the printer
     ///
     /// # Arguments
     ///
-    /// * `file_descriptor` - A struct containing the location of the file and if the request should be recursive
-    ///    * `location` - The location of the file, either `Local` or `Sdcard`
-    ///    * `path` - The location of the file
-    ///    * `force` - If the request should force the printer to refresh the cache
-    ///    * `recursive` - If the request should be recursive
+    /// `file_descriptor` - A struct describing the file to get and how to get it
+    ///    - `location` - The location of the file, either `Local` or `Sdcard`
+    ///    - `path` - The location of the file
+    ///    - `force` - If the request should force the printer to refresh the cache
+    ///    - `recursive` - If the request should be recursive
+    ///
+    /// # Errors 
+    ///
+    /// `ReqwestError` - If the request fails
+    /// `InvalidResponse` - If the response is invalid
+    /// `NoFile` - If the file does not exist
     pub async fn get_file(
         &self,
         file_descriptor: types::FileFetchDescriptor,
-    ) -> Result<types::printer_files::Entry, Box<dyn Error>> {
+    ) -> Result<types::printer_files::Entry, FileRequestError> {
         let location = match file_descriptor.location {
             types::FileLocation::Local => "local/",
             types::FileLocation::Sdcard => "sdcard/",
@@ -214,28 +283,25 @@ impl Printer {
             .get(&url)
             .header("X-Api-Key", &self.api_key)
             .send()
-            .await?;
+            .await;
 
-        match res.status() {
-            StatusCode::NOT_FOUND => {
-                panic!("File couldnt be found");
+        match res {
+            Err(e) => Err(FileRequestError::ReqwestError(e)),
+            Ok(x) => {
+                if x.status() == StatusCode::NOT_FOUND {
+                    let text = x.text().await.unwrap();
+                    return Err(FileRequestError::NoFile(text))
+                }
+
+                let text = x.text().await.unwrap();
+                let result = &mut serde_json::Deserializer::from_str(text.as_str());
+                let deserialized = serde_path_to_error::deserialize(result);
+
+                match deserialized {
+                    Err(err) => Err(FileRequestError::InvalidResponse(err.to_string())),
+                    Ok(x) => Ok(x),
+                }
             }
-            _ => {}
-        }
-
-        let text = res.text().await?;
-        let result = &mut serde_json::Deserializer::from_str(text.as_str());
-        let deseialized = serde_path_to_error::deserialize(result);
-
-        // TODO Error Handling
-        match deseialized {
-            Err(err) => {
-                let path = err.path().to_string();
-                panic!("Error at: {path}\n{err}");
-            }
-            Ok(x) => Ok(x),
         }
     }
-
-    
 }

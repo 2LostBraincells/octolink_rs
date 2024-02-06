@@ -51,8 +51,8 @@ pub fn mock_get_api_version() -> MockFrame {
             .with_body(
                 r#"{
   "api": "0.1",
-  "server": "1.3.10",
-  "text": "OctoPrint 1.3.10"
+  "server": "1.9.3",
+  "text": "OctoPrint 1.9.3"
 }"#,
             )
             .create(),
@@ -73,19 +73,64 @@ pub fn mock_get_api_connection() -> MockFrame {
             .with_body(
                 r#"{
   "current": {
-    "state": "Operational",
-    "port": "/dev/ttyACM0",
-    "baudrate": 250000,
-    "printerProfile": "_default"
+    "baudrate": null,
+    "port": null,
+    "printerProfile": "_default",
+    "state": "Closed"
   },
   "options": {
-    "ports": ["/dev/ttyACM0", "VIRTUAL"],
-    "baudrates": [250000, 230400, 115200, 57600, 38400, 19200, 9600],
-    "printerProfiles": [{"name": "Default", "id": "_default"}],
-    "portPreference": "/dev/ttyACM0",
-    "baudratePreference": 250000,
+    "baudratePreference": null,
+    "baudrates": [
+      250000,
+      230400,
+      115200,
+      57600,
+      38400,
+      19200,
+      9600
+    ],
+    "portPreference": null,
+    "ports": [
+      "/dev/ttyS0",
+      "/dev/ttyS1",
+      "/dev/ttyS2",
+      "/dev/ttyS3",
+      "/dev/ttyS4",
+      "/dev/ttyS5",
+      "/dev/ttyS6",
+      "/dev/ttyS7",
+      "/dev/ttyS8",
+      "/dev/ttyS9",
+      "/dev/ttyS10",
+      "/dev/ttyS11",
+      "/dev/ttyS12",
+      "/dev/ttyS13",
+      "/dev/ttyS14",
+      "/dev/ttyS15",
+      "/dev/ttyS16",
+      "/dev/ttyS17",
+      "/dev/ttyS18",
+      "/dev/ttyS19",
+      "/dev/ttyS20",
+      "/dev/ttyS21",
+      "/dev/ttyS22",
+      "/dev/ttyS23",
+      "/dev/ttyS24",
+      "/dev/ttyS25",
+      "/dev/ttyS26",
+      "/dev/ttyS27",
+      "/dev/ttyS28",
+      "/dev/ttyS29",
+      "/dev/ttyS30",
+      "/dev/ttyS31"
+    ],
     "printerProfilePreference": "_default",
-    "autoconnect": true
+    "printerProfiles": [
+      {
+        "id": "_default",
+        "name": "Default"
+      }
+    ]
   }
 }"#,
             )
@@ -123,83 +168,75 @@ pub fn mock_get_api_files() -> MockFrame {
                 r#"{
   "files": [
     {
-      "name": "whistle_v2.gcode",
-      "path": "whistle_v2.gcode",
-      "type": "machinecode",
-      "typePath": ["machinecode", "gcode"],
-      "hash": "...",
-      "size": 1468987,
-      "date": 1378847754,
+      "children": [],
+      "display": "folder",
+      "name": "folder",
       "origin": "local",
+      "path": "folder",
       "refs": {
-        "resource": "http://example.com/api/files/local/whistle_v2.gcode",
-        "download": "http://example.com/downloads/files/local/whistle_v2.gcode"
+        "resource": "http://127.0.0.1:5000/api/files/local/folder"
       },
-      "gcodeAnalysis": {
-        "estimatedPrintTime": 1188,
-        "filament": {
-          "length": 810,
-          "volume": 5.36
-        }
-      },
-      "print": {
-        "failure": 4,
-        "success": 23,
-        "last": {
-          "date": 1387144346,
-          "success": true
-        }
-      }
-    },
-    {
-      "name": "whistle_.gco",
-      "path": "whistle_.gco",
-      "type": "machinecode",
-      "typePath": ["machinecode", "gcode"],
-      "origin": "sdcard",
-      "refs": {
-        "resource": "http://example.com/api/files/sdcard/whistle_.gco"
-      }
-    },
-    {
-      "name": "folderA",
-      "path": "folderA",
+      "size": 801365,
       "type": "folder",
-      "typePath": ["folder"],
-      "children": [
-        {
-          "name": "whistle_v2_copy.gcode",
-          "path": "whistle_v2_copy.gcode",
-          "type": "machinecode",
-          "typePath": ["machinecode", "gcode"],
-          "hash": "...",
-          "size": 1468987,
-          "date": 1378847754,
-          "origin": "local",
-          "refs": {
-            "resource": "http://example.com/api/files/local/folderA/whistle_v2_copy.gcode",
-            "download": "http://example.com/downloads/files/local/folderA/whistle_v2_copy.gcode"
-          },
-          "gcodeAnalysis": {
-            "estimatedPrintTime": 1188,
-            "filament": {
-              "length": 810,
-              "volume": 5.36
-            }
-          },
-          "print": {
-            "failure": 4,
-            "success": 23,
-            "last": {
-              "date": 1387144346,
-              "success": true
-            }
+      "typePath": [
+        "folder"
+      ]
+    },
+    {
+      "date": 1707166449,
+      "display": "pushrod.gcode",
+      "gcodeAnalysis": {
+        "dimensions": {
+          "depth": 99.349,
+          "height": 5.0,
+          "width": 142.374
+        },
+        "estimatedPrintTime": 1368.6617568899217,
+        "filament": {
+          "tool0": {
+            "length": 1508.521400000127,
+            "volume": 3.628419182080407
           }
+        },
+        "printingArea": {
+          "maxX": 170.0,
+          "maxY": 97.349,
+          "maxZ": 5.0,
+          "minX": 27.626,
+          "minY": -2.0,
+          "minZ": 0.0
+        },
+        "travelArea": {
+          "maxX": 179.0,
+          "maxY": 178.0,
+          "maxZ": 35.0,
+          "minX": 0.0,
+          "minY": -2.0,
+          "minZ": 0.0
+        },
+        "travelDimensions": {
+          "depth": 180.0,
+          "height": 35.0,
+          "width": 179.0
         }
+      },
+      "name": "pushrod.gcode",
+      "origin": "local",
+      "path": "pushrod.gcode",
+      "refs": {
+        "download": "http://127.0.0.1:5000/downloads/files/local/pushrod.gcode",
+        "resource": "http://127.0.0.1:5000/api/files/local/pushrod.gcode"
+      },
+      "size": 801365,
+      "type": "machinecode",
+      "typePath": [
+        "machinecode",
+        "gcode"
       ]
     }
   ],
-  "free": "3.2GB"
+  "free": 423822610432,
+  "total": 499031998464
 }"#,
             )
             .create(),
@@ -221,98 +258,128 @@ pub fn mock_get_api_files_q_recursive() -> MockFrame {
                 r#"{
   "files": [
     {
-      "name": "whistle_v2.gcode",
-      "path": "whistle_v2.gcode",
-      "type": "machinecode",
-      "typePath": ["machinecode", "gcode"],
-      "hash": "...",
-      "size": 1468987,
-      "date": 1378847754,
-      "origin": "local",
-      "refs": {
-        "resource": "http://example.com/api/files/local/whistle_v2.gcode",
-        "download": "http://example.com/downloads/files/local/whistle_v2.gcode"
-      },
-      "gcodeAnalysis": {
-        "estimatedPrintTime": 1188,
-        "filament": {
-          "length": 810,
-          "volume": 5.36
-        }
-      },
-      "print": {
-        "failure": 4,
-        "success": 23,
-        "last": {
-          "date": 1387144346,
-          "success": true
-        }
-      }
-    },
-    {
-      "name": "whistle_.gco",
-      "path": "whistle_.gco",
-      "type": "machinecode",
-      "typePath": ["machinecode", "gcode"],
-      "origin": "sdcard",
-      "refs": {
-        "resource": "http://example.com/api/files/sdcard/whistle_.gco"
-      }
-    },
-    {
-      "name": "folderA",
-      "path": "folderA",
-      "type": "folder",
-      "typePath": ["folder"],
       "children": [
         {
-          "name": "test.gcode",
-          "path": "folderA/test.gcode",
-          "type": "machinecode",
-          "typePath": ["machinecode", "gcode"],
-          "hash": "...",
-          "size": 1234,
-          "date": 1378847754,
-          "origin": "local",
-          "refs": {
-            "resource": "http://example.com/api/files/local/folderA/test.gcode",
-            "download": "http://example.com/downloads/files/local/folderA/test.gcode"
-          }
-        },
-        {
-          "name": "subfolder",
-          "path": "folderA/subfolder",
-          "type": "folder",
-          "typePath": ["folder"],
-          "children": [
-            {
-              "name": "test.gcode",
-              "path": "folderA/subfolder/test2.gcode",
-              "type": "machinecode",
-              "typePath": ["machinecode", "gcode"],
-              "hash": "...",
-              "size": 100,
-              "date": 1378847754,
-              "origin": "local",
-              "refs": {
-                "resource": "http://example.com/api/files/local/folderA/subfolder/test2.gcode",
-                "download": "http://example.com/downloads/files/local/folderA/subfolder/test2.gcode"
+          "date": 1707166498,
+          "display": "pushrod.gcode",
+          "gcodeAnalysis": {
+            "dimensions": {
+              "depth": 99.349,
+              "height": 5.0,
+              "width": 142.374
+            },
+            "estimatedPrintTime": 1368.6617568899217,
+            "filament": {
+              "tool0": {
+                "length": 1508.521400000127,
+                "volume": 3.628419182080407
               }
+            },
+            "printingArea": {
+              "maxX": 170.0,
+              "maxY": 97.349,
+              "maxZ": 5.0,
+              "minX": 27.626,
+              "minY": -2.0,
+              "minZ": 0.0
+            },
+            "travelArea": {
+              "maxX": 179.0,
+              "maxY": 178.0,
+              "maxZ": 35.0,
+              "minX": 0.0,
+              "minY": -2.0,
+              "minZ": 0.0
+            },
+            "travelDimensions": {
+              "depth": 180.0,
+              "height": 35.0,
+              "width": 179.0
             }
-          ],
-          "size": 100,
+          },
+          "name": "pushrod.gcode",
+          "origin": "local",
+          "path": "folder/pushrod.gcode",
           "refs": {
-            "resource": "http://example.com/api/files/local/folderA/subfolder"
-          }
+            "download": "http://127.0.0.1:5000/downloads/files/local/folder/pushrod.gcode",
+            "resource": "http://127.0.0.1:5000/api/files/local/folder/pushrod.gcode"
+          },
+          "size": 801365,
+          "type": "machinecode",
+          "typePath": [
+            "machinecode",
+            "gcode"
+          ]
         }
       ],
-      "size": 1334,
+      "display": "folder",
+      "name": "folder",
+      "origin": "local",
+      "path": "folder",
       "refs": {
-        "resource": "http://example.com/api/files/local/folderA"
-      }
+        "resource": "http://127.0.0.1:5000/api/files/local/folder"
+      },
+      "size": 801365,
+      "type": "folder",
+      "typePath": [
+        "folder"
+      ]
+    },
+    {
+      "date": 1707166449,
+      "display": "pushrod.gcode",
+      "gcodeAnalysis": {
+        "dimensions": {
+          "depth": 99.349,
+          "height": 5.0,
+          "width": 142.374
+        },
+        "estimatedPrintTime": 1368.6617568899217,
+        "filament": {
+          "tool0": {
+            "length": 1508.521400000127,
+            "volume": 3.628419182080407
+          }
+        },
+        "printingArea": {
+          "maxX": 170.0,
+          "maxY": 97.349,
+          "maxZ": 5.0,
+          "minX": 27.626,
+          "minY": -2.0,
+          "minZ": 0.0
+        },
+        "travelArea": {
+          "maxX": 179.0,
+          "maxY": 178.0,
+          "maxZ": 35.0,
+          "minX": 0.0,
+          "minY": -2.0,
+          "minZ": 0.0
+        },
+        "travelDimensions": {
+          "depth": 180.0,
+          "height": 35.0,
+          "width": 179.0
+        }
+      },
+      "name": "pushrod.gcode",
+      "origin": "local",
+      "path": "pushrod.gcode",
+      "refs": {
+        "download": "http://127.0.0.1:5000/downloads/files/local/pushrod.gcode",
+        "resource": "http://127.0.0.1:5000/api/files/local/pushrod.gcode"
+      },
+      "size": 801365,
+      "type": "machinecode",
+      "typePath": [
+        "machinecode",
+        "gcode"
+      ]
     }
   ],
-  "free": "3.2GB"
+  "free": 423822696448,
+  "total": 499031998464
 }"#,
             )
             .create(),
@@ -334,36 +401,75 @@ pub fn mock_get_api_files_local() -> MockFrame {
                 r#"{
   "files": [
     {
-      "name": "whistle_v2.gcode",
-      "path": "whistle_v2.gcode",
-      "type": "machinecode",
-      "typePath": ["machinecode", "gcode"],
-      "hash": "...",
-      "size": 1468987,
-      "date": 1378847754,
+      "children": [],
+      "display": "folder",
+      "name": "folder",
       "origin": "local",
+      "path": "folder",
       "refs": {
-        "resource": "http://example.com/api/files/local/whistle_v2.gcode",
-        "download": "http://example.com/downloads/files/local/whistle_v2.gcode"
+        "resource": "http://127.0.0.1:5000/api/files/local/folder"
       },
+      "size": 4614729,
+      "type": "folder",
+      "typePath": [
+        "folder"
+      ]
+    },
+    {
+      "date": 1707166449,
+      "display": "pushrod.gcode",
       "gcodeAnalysis": {
-        "estimatedPrintTime": 1188,
+        "dimensions": {
+          "depth": 99.349,
+          "height": 5.0,
+          "width": 142.374
+        },
+        "estimatedPrintTime": 1368.6617568899217,
         "filament": {
-          "length": 810,
-          "volume": 5.36
+          "tool0": {
+            "length": 1508.521400000127,
+            "volume": 3.628419182080407
+          }
+        },
+        "printingArea": {
+          "maxX": 170.0,
+          "maxY": 97.349,
+          "maxZ": 5.0,
+          "minX": 27.626,
+          "minY": -2.0,
+          "minZ": 0.0
+        },
+        "travelArea": {
+          "maxX": 179.0,
+          "maxY": 178.0,
+          "maxZ": 35.0,
+          "minX": 0.0,
+          "minY": -2.0,
+          "minZ": 0.0
+        },
+        "travelDimensions": {
+          "depth": 180.0,
+          "height": 35.0,
+          "width": 179.0
         }
       },
-      "print": {
-        "failure": 4,
-        "success": 23,
-        "last": {
-          "date": 1387144346,
-          "success": true
-        }
-      }
+      "name": "pushrod.gcode",
+      "origin": "local",
+      "path": "pushrod.gcode",
+      "refs": {
+        "download": "http://127.0.0.1:5000/downloads/files/local/pushrod.gcode",
+        "resource": "http://127.0.0.1:5000/api/files/local/pushrod.gcode"
+      },
+      "size": 801365,
+      "type": "machinecode",
+      "typePath": [
+        "machinecode",
+        "gcode"
+      ]
     }
   ],
-  "free": "3.2GB"
+  "free": 423737376768,
+  "total": 499031998464
 }
                    "#,
             )
@@ -379,38 +485,63 @@ pub fn mock_get_api_files_local_gcode_whistle() -> MockFrame {
     let mock = Some(
         server
             .server
-            .mock("GET", "/api/files/local/gcode/whistle/whistle_v2.gcode")
+            .mock("GET", "/api/files/local/folder/printed.gcode")
             .match_header("X-Api-Key", server.api_key.as_str())
             .with_status(200)
             .with_body(
                 r#"
 {
-  "name": "whistle_v2.gcode",
-  "type": "machinecode",
-  "size": 1468987,
-  "date": 1378847754,
-  "origin": "local",
-  "refs": {
-    "resource": "http://example.com/api/files/local/whistle_v2.gcode",
-    "download": "http://example.com/downloads/files/local/whistle_v2.gcode"
-  },
+  "date": 1707214053,
+  "display": "printed.gcode",
   "gcodeAnalysis": {
-    "estimatedPrintTime": 1188,
+    "dimensions": {
+      "depth": 233.447,
+      "height": 30.8,
+      "width": 222.0
+    },
+    "estimatedPrintTime": 4693.44709714754,
     "filament": {
-      "length": 810,
-      "volume": 5.36
+      "tool0": {
+        "length": 15976.600509998501,
+        "volume": 38.42822763728064
+      }
+    },
+    "printingArea": {
+      "maxX": 240.0,
+      "maxY": 234.447,
+      "maxZ": 30.8,
+      "minX": 18.0,
+      "minY": 1.0,
+      "minZ": 0.0
+    },
+    "travelArea": {
+      "maxX": 240.0,
+      "maxY": 265.0,
+      "maxZ": 130.8,
+      "minX": 0.0,
+      "minY": -3.0,
+      "minZ": -1.5
+    },
+    "travelDimensions": {
+      "depth": 268.0,
+      "height": 132.3,
+      "width": 240.0
     }
   },
-  "print": {
-    "failure": 4,
-    "success": 23,
-    "last": {
-      "date": 1387144346,
-      "success": true
-    }
-  }
-}
-            "#,
+  "name": "printed.gcode",
+  "origin": "local",
+  "path": "folder/printed.gcode",
+  "refs": {
+    "download": "http://127.0.0.1:5000/downloads/files/local/folder/printed.gcode",
+    "resource": "http://127.0.0.1:5000/api/files/local/folder/printed.gcode"
+  },
+  "size": 3813364,
+  "type": "machinecode",
+  "typePath": [
+    "machinecode",
+    "gcode"
+  ]
+}            "#,
             )
             .create(),
     );

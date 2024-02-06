@@ -25,8 +25,8 @@ pub struct PrinterConnection {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct PrinterConnectionStateCurrent {
     state: String,
-    port: String,
-    baudrate: u32,
+    port: Option<String>,
+    baudrate: Option<u32>,
     #[serde(rename = "printerProfile")]
     printer_profile: String,
 }
@@ -156,7 +156,8 @@ pub mod printer_files {
     pub struct Files {
         #[serde(default)]
         files: Vec<Entry>,
-        free: String,
+        free: u64,
+        total: u64,
     }
 
     #[derive(Serialize, Deserialize, Debug)]
@@ -165,15 +166,16 @@ pub mod printer_files {
         #[serde(alias = "machinecode")]
         #[serde(alias = "model")]
         File {
+            display: String,
             name: String,
-            path: Option<String>,
+            path: String,
             #[serde(default)]
             #[serde(rename = "typePath")]
             type_path: Vec<String>,
             origin: String,
+            date: Option<u64>,
             hash: Option<String>,
             size: Option<u64>,
-            date: Option<u64>,
             refs: Option<Refs>,
             #[serde(rename = "gcodeAnalysis")]
             gcode_analysis: Option<GcodeAnalysis>,
@@ -182,14 +184,17 @@ pub mod printer_files {
         },
         #[serde(alias = "folder")]
         Folder {
+            #[serde(default)]
+            children: Vec<Entry>,
+            display: String,
             name: String,
+            origin: String,
             path: String,
+            refs: Option<Refs>,
             #[serde(default)]
             #[serde(rename = "typePath")]
             type_path: Vec<String>,
             size: Option<u64>,
-            #[serde(default)]
-            children: Vec<Entry>,
         }
     }
 
@@ -238,9 +243,14 @@ pub mod printer_files {
     }
 
     #[derive(Serialize, Deserialize, Debug)]
-    pub struct GCodeAnalysisTools {
+    pub struct GCodeAnalysisTool {
         length: f32,
         volume: f32,
+    }
+
+    #[derive(Serialize, Deserialize, Debug)]
+    pub struct GCodeAnalysisTools {
+        tool0: GCodeAnalysisTool,
     }
 
     #[derive(Serialize, Deserialize, Debug)]
