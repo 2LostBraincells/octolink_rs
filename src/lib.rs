@@ -343,7 +343,10 @@ impl Printer {
     ///     command: FileCommand::Copy {
     ///         destination: "/folder".to_string()
     ///     },
-    ///     path: PathDescriptor,
+    ///     path: PathDescriptor {
+    ///         location: FileLocation::Local,
+    ///         path: "/folder/file.gcode".to_string()
+    ///     },
     /// });
     pub async fn issue_file_command(
         &self,

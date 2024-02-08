@@ -54,7 +54,7 @@ fn parse_file() {
   "typePath": [
     "machinecode",
     "gcode"
-  ],
+  ]
 }
 "#;
 

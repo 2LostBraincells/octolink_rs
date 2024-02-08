@@ -307,14 +307,16 @@ pub mod printer_files {
 
     #[derive(Serialize, Deserialize, Debug)]
     pub struct GCodeAnalysis {
+        dimensions: Dimension,
         #[serde(rename = "estimatedPrintTime")]
-        estimated_print_time: Option<f32>,
-        dimensions: Option<Dimension>,
-        printing_area: Option<GCodeAnalysisArea>,
-        travel_area: Option<GCodeAnalysisArea>,
-        travel_dimensions: Option<Dimension>,
-        #[serde(flatten)]
-        filament: GCodeAnalysisTools
+        estimated_print_time: f32,
+        filament: GCodeAnalysisTools,
+        #[serde(rename = "printingArea")]
+        printing_area: GCodeAnalysisArea,
+        #[serde(rename = "travelArea")]
+        travel_area: GCodeAnalysisArea,
+        #[serde(rename = "travelDimensions")]
+        travel_dimensions: Dimension,
     }
 
     #[derive(Serialize, Deserialize, Debug)]
