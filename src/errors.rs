@@ -4,7 +4,7 @@ use reqwest::Error as ReqwestError;
 #[derive(Debug)]
 pub enum InformationRequestError {
     ReqwestError(ReqwestError),
-    InvalidResponse(String),
+    ParseError(String),
 }
 
 #[derive(Debug)]
@@ -17,7 +17,7 @@ pub enum SetConnectionError {
 #[derive(Debug)]
 pub enum FileRequestError {
     ReqwestError(ReqwestError),
-    InvalidResponse(String),
+    ParseError(String),
     NotFound(String)
 }
 
@@ -44,5 +44,11 @@ pub enum FileDeletionError {
 #[derive(Debug)]
 pub enum JobCommandError {
     ReqwestError(ReqwestError),
+    Conflict(String),
+}
+
+pub enum PrinterCommandError {
+    ReqwestError(ReqwestError),
+    ParseError(String),
     Conflict(String),
 }

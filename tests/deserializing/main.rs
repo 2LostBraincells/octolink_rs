@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use octoprint_rs::types::printer_files::Entry;
+use octoprint_rs::types::{printer_files::Entry, PrinterTemperature, TemperatureHistoryEntry};
 
 #[test]
 fn parse_file() {
@@ -281,4 +281,111 @@ fn parse_gcode_analysis_estimated_print_time() {
     let estimated_time: Option<f32> = deserialized.unwrap();
 
     assert_eq!(estimated_time, Some(1368.6617568899217));
+}
+
+#[test]
+fn parse_printer_temperatire() {
+    let json = r#"{
+    "tool0": {
+      "actual": 214.8821,
+      "target": 220.0,
+      "offset": 0
+    },
+    "tool1": {
+      "actual": 25.3,
+      "target": null,
+      "offset": 0
+    },
+    "bed": {
+      "actual": 50.221,
+      "target": 70.0,
+      "offset": 5
+    },
+    "history": [
+      {
+        "time": 1395651928,
+        "tool0": {
+          "actual": 214.8821,
+          "target": 220.0
+        },
+        "tool1": {
+          "actual": 25.3,
+          "target": null
+        },
+        "bed": {
+          "actual": 50.221,
+          "target": 70.0
+        }
+      },
+      {
+        "time": 1395651926,
+        "tool0": {
+          "actual": 212.32,
+          "target": 220.0
+        },
+        "tool1": {
+          "actual": 25.1,
+          "target": null
+        },
+        "bed": {
+          "actual": 49.1123,
+          "target": 70.0
+        }
+      }
+    ]
+  }"#;
+
+    let result = &mut serde_json::Deserializer::from_str(json);
+    let deserialized = serde_path_to_error::deserialize(result);
+
+    let temperatures: PrinterTemperature = deserialized.unwrap(); 
+
+    assert_eq!(temperatures.tools.get("tool0").unwrap().actual, 214.8821);
+    assert_eq!(temperatures.tools.get("tool1").unwrap().actual, 25.3);
+    assert_eq!(temperatures.tools.get("bed").unwrap().actual, 50.221);
+}
+
+#[test]
+fn parse_printer_temperature_history() {
+    let json = r#"[
+      {
+        "time": 1395651928,
+        "tool0": {
+          "actual": 214.8821,
+          "target": 220.0
+        },
+        "tool1": {
+          "actual": 25.3,
+          "target": null
+        },
+        "bed": {
+          "actual": 50.221,
+          "target": 70.0
+        }
+      },
+      {
+        "time": 1395651926,
+        "tool0": {
+          "actual": 212.32,
+          "target": 220.0
+        },
+        "tool1": {
+          "actual": 25.1,
+          "target": null
+        },
+        "bed": {
+          "actual": 49.1123,
+          "target": 70.0
+        }
+      }
+    ]"#;
+
+    let result = &mut serde_json::Deserializer::from_str(json);
+    let deserialized = serde_path_to_error::deserialize(result);
+
+    let history: Vec<TemperatureHistoryEntry> = deserialized.unwrap();
+
+    assert_eq!(history.len(), 2);
+    assert_eq!(history[0].time, 1395651928);
+    assert_eq!(history[1].time, 1395651926);
 }

@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 
 
@@ -436,18 +438,58 @@ pub struct JobProgress {
 }
 
 //
-//  INFO: PRINTER
+//  INFO: PRINTER INFO
 //
 
-//#[derive(Serialize, Deserialize, Debug)]
-//pub struct RawPrinter {
-//    pub temperature: PrinterTemperature,
-//    pub sd: SdState,
-//    state: PrinterState,
-//}
-//
-//#[derive(Serialize, Deserialize, Debug)]
-//pub struct PrinterTemperature {
-//    Vec<ToolTemperature>,
-//    history: Vec<Printertemperaturehistory>,
-//}
+#[derive(Serialize, Deserialize, Debug)]
+pub struct RawPrinter {
+    pub temperature: PrinterTemperature,
+    pub sd: SdState,
+    pub state: PrinterState,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PrinterTool {
+    pub actual: f32,
+    pub target: Option<f32>,
+    pub offset: Option<f32>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PrinterTemperature {
+    pub history: Vec<TemperatureHistoryEntry>,
+    #[serde(flatten)]
+    pub tools: HashMap<String, PrinterTool>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct TemperatureHistoryEntry {
+    pub time: u64,
+    #[serde(flatten)]
+    pub tools: HashMap<String, PrinterTool>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SdState {
+    pub ready: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PrinterState {
+    pub text: String,
+    pub flags: PrinterStateFlags,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct PrinterStateFlags {
+    pub operational: bool,
+    pub paused: bool,
+    pub pausing: bool,
+    pub printing: bool,
+    pub cancelling: bool,
+    pub sd_ready: bool,
+    pub error: bool,
+    pub ready: bool,
+    pub closed_or_error: bool,
+}

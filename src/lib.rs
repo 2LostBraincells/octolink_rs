@@ -1,9 +1,6 @@
-use errors::{
-    FileCommandError, FileDeletionError, FileRequestError, InformationRequestError,
-    JobCommandError, SetConnectionError,
-};
+use errors::*;
 use reqwest::{Client, StatusCode};
-use types::JobCommand;
+use types::*;
 
 pub mod errors;
 pub mod types;
@@ -63,7 +60,7 @@ impl Printer {
     ///
     /// If there is an error, it will return a `InformationRequestError`
     /// * `ReqwestError` - If the request fails
-    /// * `InvalidResponse` - If the response is invalid
+    /// * `ParseError` - If the response can not be parsed
     pub async fn get_api_version(&self) -> Result<types::ApiVersion, InformationRequestError> {
         let url = format!("http://{}:{}/api/version", self.address, self.port);
 
@@ -101,7 +98,7 @@ impl Printer {
     ///
     /// If there is an error, it will return a `InformationRequestError`
     /// * `ReqwestError` - If the request fails
-    /// * `InvalidResponse` - If the response is invalid
+    /// * `ParseError` - If the response can not be parsed
     pub async fn get_connection(
         &self,
     ) -> Result<types::PrinterConnection, InformationRequestError> {
@@ -137,7 +134,7 @@ impl Printer {
     ///
     /// If the request fails, it will return a `SetConnectionError`
     /// * `ReqwestError` - If the request fails
-    /// * `InvalidRequest` - If the request is invalid
+    /// * `ParseError` - If the response can not be parsed
     pub async fn set_connection(
         &self,
         connection: types::ConnectionCommandDescriptor,
@@ -216,7 +213,7 @@ impl Printer {
             Ok(x) => {
                 if x.status() != StatusCode::OK {
                     let text = x.text().await.unwrap();
-                    return Err(FileRequestError::InvalidResponse(text));
+                    return Err(FileRequestError::ParseError(text));
                 }
 
                 let text = x.text().await.unwrap();
@@ -224,7 +221,7 @@ impl Printer {
                 let deserialized = serde_path_to_error::deserialize(result);
 
                 match deserialized {
-                    Err(err) => Err(FileRequestError::InvalidResponse(err.to_string())),
+                    Err(err) => Err(FileRequestError::ParseError(err.to_string())),
                     Ok(x) => Ok(x),
                 }
             }
@@ -245,9 +242,9 @@ impl Printer {
     ///
     /// # Errors
     ///
-    /// `ReqwestError` - If the request fails
-    /// `InvalidResponse` - If the response is invalid
-    /// `NoFile` - If the file does not exist
+    /// * `ReqwestError` - If the request fails
+    /// * `ParseError` - If the response can not be parsed
+    /// * `NoFile` - If the file does not exist
     pub async fn get_file(
         &self,
         file_descriptor: types::FileFetchDescriptor,
@@ -302,7 +299,7 @@ impl Printer {
                 let deserialized = serde_path_to_error::deserialize(result);
 
                 match deserialized {
-                    Err(err) => Err(FileRequestError::InvalidResponse(err.to_string())),
+                    Err(err) => Err(FileRequestError::ParseError(err.to_string())),
                     Ok(x) => Ok(x),
                 }
             }
@@ -490,12 +487,31 @@ impl Printer {
 
     /// Gets the current job information from the printer
     ///
+    /// # Returns
+    ///
+    /// If there is no error, this function returns a [`JobInformation`](types::JobInformation) struct representing the current job information.
+    ///
     /// # Errors
     ///
     /// If there is an error, it will return a `InformationRequestError`
     /// * `ReqwestError` - If the request fails
-    /// * `InvalidResponse` - If the response is invalid
+    /// * `ParseError` - If the response can not be parsed.
     /// This can happen if the wrapper is outdated and they changed something in the api. (cry about it)
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use octoprint_rs::PrinterBuilder;
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// let printer = PrinterBuilder::new("localhost", "API_KEY")
+    ///     .port(42069)
+    ///     .build();
+    ///
+    /// let job = printer
+    ///     .get_job()
+    ///     .await;
+    /// # }
     pub async fn get_job(&self) -> Result<types::JobInformation, InformationRequestError> {
         let url = "/api/job";
 
@@ -514,12 +530,69 @@ impl Printer {
                 let deserialized = serde_path_to_error::deserialize(result);
 
                 match deserialized {
-                    Err(e) => Err(InformationRequestError::InvalidResponse(e.to_string())),
+                    Err(e) => Err(InformationRequestError::ParseError(e.to_string())),
                     Ok(x) => Ok(x),
                 }
             }
         }
     }
 
+    /// Gets the current printer telemetry.
+    ///
+    /// # Returns
+    ///
+    /// This function returns a [`RawPrinter`](types::RawPrinter) struct representing the current printer telemetry.
+    ///
+    /// # Errors
+    ///
+    /// If there is an error this function will return a [`PrinterCommandError`](errors::PrinterCommandError) enum.
+    /// * `ReqwestError` - If the request fails
+    /// * `Conflict` - If the server responds with a `409` status code. This can happen if the
+    /// printer is not connected.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use octoprint_rs::PrinterBuilder;
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// use static_assertions::assert_type_eq_all;
+    ///
+    /// let printer = PrinterBuilder::new("localhost", "API_KEY")
+    ///     .port(42069)
+    ///     .build();
+    ///
+    /// let telemetry = printer
+    ///     .get_printer_telemetry()
+    ///     .await;
+    /// # }
+    pub async fn get_printer_telemetry(&self) -> Result<types::RawPrinter, PrinterCommandError> {
+        let url = format!("http://{}:{}/api/printer", self.address, self.port);
 
+        let res = self
+            .client
+            .get(&url)
+            .header("X-Api-Key", &self.api_key)
+            .send()
+            .await;
+
+        match res {
+            Err(e) => Err(PrinterCommandError::ReqwestError(e)),
+            Ok(x) => {
+                if x.status() == StatusCode::CONFLICT {
+                    let text = x.text().await.unwrap();
+                    return Err(PrinterCommandError::Conflict(text));
+                }
+
+                let text = x.text().await.unwrap();
+                let result = &mut serde_json::Deserializer::from_str(text.as_str());
+                let deserialized = serde_path_to_error::deserialize(result);
+
+                match deserialized {
+                    Err(e) => panic!("wut: {}", e.to_string()),
+                    Ok(x) => Ok(x),
+                }
+            }
+        }
+    } 
 }
