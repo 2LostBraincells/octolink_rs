@@ -162,7 +162,7 @@ impl Printer {
     }
 
     //
-    //  NOTE: File operations
+    //  INFO: File operations
     //
 
     /// Will get the printer files and folders from the specified folder

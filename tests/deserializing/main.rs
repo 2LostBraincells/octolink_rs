@@ -128,7 +128,19 @@ fn parse_file_without_analysis() {
     let result = &mut serde_json::Deserializer::from_str(json);
     let deserialized = serde_path_to_error::deserialize(result);
 
-    let _: Entry = deserialized.unwrap();
+    let file: Entry = deserialized.unwrap();
+
+    if let Entry::File { date, display, name, origin, path, refs, size, type_path, .. } = file {
+        assert_eq!(date, Some(1707166498));
+        assert_eq!(display, "pushrod.gcode");
+        assert_eq!(name, "pushrod.gcode");
+        assert_eq!(origin, "local");
+        assert_eq!(path, "folder/pushrod.gcode");
+        assert_eq!(refs.as_ref().unwrap().download, Some("http://127.0.0.1:5000/downloads/files/local/folder/pushrod.gcode".to_string()));
+        assert_eq!(refs.unwrap().resource, "http://127.0.0.1:5000/api/files/local/folder/pushrod.gcode");
+        assert_eq!(size, Some(801365));
+        assert_eq!(type_path, vec!["machinecode".to_string(), "gcode".to_string()]);
+    }
 }
 
 #[test]
@@ -186,7 +198,11 @@ fn parse_gcode_analysis_dimensions() {
     let result = &mut serde_json::Deserializer::from_str(json);
     let deserialized = serde_path_to_error::deserialize(result);
 
-    let _: octoprint_rs::types::Dimension = deserialized.unwrap();
+    let dimension: octoprint_rs::types::Dimension = deserialized.unwrap();
+
+    assert_eq!(dimension.depth, 99.349);
+    assert_eq!(dimension.height, 5.0);
+    assert_eq!(dimension.width, 142.374);
 }
 
 #[test]
@@ -203,7 +219,14 @@ fn parse_gcode_analysis_printing_area() {
     let result = &mut serde_json::Deserializer::from_str(json);
     let deserialized = serde_path_to_error::deserialize(result);
 
-    let _: octoprint_rs::types::printer_files::GCodeAnalysisArea = deserialized.unwrap();
+    let area: octoprint_rs::types::printer_files::GCodeAnalysisArea = deserialized.unwrap();
+
+    assert_eq!(area.max_x, 170.0);
+    assert_eq!(area.max_y, 97.349);
+    assert_eq!(area.max_z, 5.0);
+    assert_eq!(area.min_x, 27.626);
+    assert_eq!(area.min_y, -2.0);
+    assert_eq!(area.min_z, 0.0);
 }
 
 #[test]
@@ -220,7 +243,14 @@ fn parse_gcode_analysis_travel_area() {
     let result = &mut serde_json::Deserializer::from_str(json);
     let deserialized = serde_path_to_error::deserialize(result);
 
-    let _: octoprint_rs::types::printer_files::GCodeAnalysisArea = deserialized.unwrap();
+    let area: octoprint_rs::types::printer_files::GCodeAnalysisArea = deserialized.unwrap();
+
+    assert_eq!(area.max_x, 179.0);
+    assert_eq!(area.max_y, 178.0);
+    assert_eq!(area.max_z, 35.0);
+    assert_eq!(area.min_x, 0.0);
+    assert_eq!(area.min_y, -2.0);
+    assert_eq!(area.min_z, 0.0);
 }
 
 #[test]
@@ -234,7 +264,11 @@ fn parse_gcode_analysis_travel_dimensions() {
     let result = &mut serde_json::Deserializer::from_str(json);
     let deserialized = serde_path_to_error::deserialize(result);
 
-    let _: octoprint_rs::types::Dimension = deserialized.unwrap();
+    let dimensions: octoprint_rs::types::Dimension = deserialized.unwrap();
+
+    assert_eq!(dimensions.depth, 180.0);
+    assert_eq!(dimensions.height, 35.0);
+    assert_eq!(dimensions.width, 179.0);
 }
 
 #[test]
@@ -244,5 +278,7 @@ fn parse_gcode_analysis_estimated_print_time() {
     let result = &mut serde_json::Deserializer::from_str(json);
     let deserialized = serde_path_to_error::deserialize(result);
 
-    let _: f64 = deserialized.unwrap();
+    let estimated_time: Option<f32> = deserialized.unwrap();
+
+    assert_eq!(estimated_time, Some(1368.6617568899217));
 }

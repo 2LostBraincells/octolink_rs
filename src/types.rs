@@ -7,12 +7,9 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Dimension {
-    #[serde(rename = "width")]
-    pub x: f32,
-    #[serde(rename = "height")]
-    pub y: f32,
-    #[serde(rename = "depth")]
-    pub z: f32,
+    pub width: f32,
+    pub height: f32,
+    pub depth: f32,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -265,24 +262,23 @@ pub mod printer_files {
     pub enum Entry {
         #[serde(alias = "machinecode")]
         #[serde(alias = "model")]
+        #[serde(rename_all = "camelCase")]
         File {
             display: String,
             name: String,
             path: String,
-            #[serde(default)]
-            #[serde(rename = "typePath")]
             type_path: Vec<String>,
             origin: String,
             date: Option<u64>,
             hash: Option<String>,
             size: Option<u64>,
             refs: Option<Refs>,
-            #[serde(rename = "gcodeAnalysis")]
             gcode_analysis: Option<GCodeAnalysis>,
             print: Option<PrintHistory>,
             statistics: Option<Statistics>,
         },
         #[serde(alias = "folder")]
+        #[serde(rename_all = "camelCase")]
         Folder {
             #[serde(default)]
             children: Vec<Entry>,
@@ -292,7 +288,6 @@ pub mod printer_files {
             path: String,
             refs: Option<Refs>,
             #[serde(default)]
-            #[serde(rename = "typePath")]
             type_path: Vec<String>,
             size: Option<u64>,
         },
@@ -300,39 +295,31 @@ pub mod printer_files {
 
     #[derive(Serialize, Deserialize, Debug)]
     pub struct Refs {
-        resource: String,
-        download: Option<String>,
-        model: Option<String>,
+        pub resource: String,
+        pub download: Option<String>,
+        pub model: Option<String>,
     }
 
     #[derive(Serialize, Deserialize, Debug)]
+    #[serde(rename_all = "camelCase")]
     pub struct GCodeAnalysis {
         dimensions: Dimension,
-        #[serde(rename = "estimatedPrintTime")]
-        estimated_print_time: f32,
-        filament: GCodeAnalysisTools,
-        #[serde(rename = "printingArea")]
-        printing_area: GCodeAnalysisArea,
-        #[serde(rename = "travelArea")]
-        travel_area: GCodeAnalysisArea,
-        #[serde(rename = "travelDimensions")]
-        travel_dimensions: Dimension,
+        estimated_print_time: Option<f32>,
+        printing_area: Option<GCodeAnalysisArea>,
+        travel_area: Option<GCodeAnalysisArea>,
+        travel_dimensions: Option<Dimension>,
+        filament: Option<GCodeAnalysisTools>,
     }
 
     #[derive(Serialize, Deserialize, Debug)]
+    #[serde(rename_all = "camelCase")]
     pub struct GCodeAnalysisArea {
-        #[serde(rename = "minX")]
-        min_x: f32,
-        #[serde(rename = "minY")]
-        min_y: f32,
-        #[serde(rename = "minZ")]
-        min_z: f32,
-        #[serde(rename = "maxX")]
-        max_x: f32,
-        #[serde(rename = "maxY")]
-        max_y: f32,
-        #[serde(rename = "maxZ")]
-        max_z: f32,
+        pub min_x: f32,
+        pub min_y: f32,
+        pub min_z: f32,
+        pub max_x: f32,
+        pub max_y: f32,
+        pub max_z: f32,
     }
 
     #[derive(Serialize, Deserialize, Debug)]
@@ -349,18 +336,17 @@ pub mod printer_files {
     }
 
     #[derive(Serialize, Deserialize, Debug)]
+    #[serde(rename_all = "camelCase")]
     pub struct PrintHistoryLast {
         date: u64,
-        #[serde(rename = "printTime")]
         print_time: Option<f32>,
         success: bool,
     }
 
     #[derive(Serialize, Deserialize, Debug)]
+    #[serde(rename_all = "camelCase")]
     pub struct Statistics {
-        #[serde(rename = "averagePrintTime")]
         average_print_time: HashMap<String, f32>,
-        #[serde(rename = "lastPrintTime")]
         last_print_time: HashMap<String, f32>,
     }
 }
