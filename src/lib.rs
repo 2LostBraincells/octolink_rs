@@ -1,5 +1,5 @@
 use errors::*;
-use reqwest::{Client, StatusCode};
+use reqwest::{Client, StatusCode, Response};
 use types::*;
 
 pub mod errors;
@@ -73,18 +73,11 @@ impl Printer {
             .send()
             .await;
 
-        match res {
-            Err(e) => Err(InformationRequestError::ReqwestError(e)),
-            Ok(x) => {
-                dbg!(&x);
-
-                let body = x.json::<types::ApiVersion>().await;
-                match body {
-                    Err(e) => Err(InformationRequestError::ReqwestError(e)),
-                    Ok(x) => Ok(x),
-                }
-            }
-        }
+        Ok(res
+            .map_err(InformationRequestError::ReqwestError)?
+            .json::<types::ApiVersion>()
+            .await
+            .map_err(|e| InformationRequestError::ParseError(e.to_string()))?)
     }
 
     //
@@ -110,18 +103,11 @@ impl Printer {
             .send()
             .await;
 
-        match res {
-            Err(e) => Err(InformationRequestError::ReqwestError(e)),
-            Ok(x) => {
-                dbg!(&x);
-
-                let body = x.json::<types::PrinterConnection>().await;
-                match body {
-                    Err(e) => Err(InformationRequestError::ReqwestError(e)),
-                    Ok(x) => Ok(x),
-                }
-            }
-        }
+        Ok(res
+            .map_err(InformationRequestError::ReqwestError)?
+            .json::<types::PrinterConnection>()
+            .await
+            .map_err(|e| InformationRequestError::ParseError(e.to_string()))?)
     }
 
     /// Set the connection settings of the printer
@@ -150,7 +136,7 @@ impl Printer {
 
         match res {
             Err(e) => Err(SetConnectionError::ReqwestError(e)),
-            Ok(x) if x.status() != StatusCode::OK => {
+            Ok(x) if !x.status().is_success() => {
                 let text = x.text().await.unwrap();
                 Err(SetConnectionError::BadRequest(text))
             }
@@ -190,8 +176,7 @@ impl Printer {
             }
         } else if files_descriptor.recursive {
             "?recursive=true"
-        } else {
-            ""
+        } else { ""
         };
 
         let url = format!(
@@ -211,7 +196,7 @@ impl Printer {
         match res {
             Err(e) => Err(FileRequestError::ReqwestError(e)),
             Ok(x) => {
-                if x.status() != StatusCode::OK {
+                if !x.status().is_success() {
                     let text = x.text().await.unwrap();
                     return Err(FileRequestError::ParseError(text));
                 }
@@ -392,7 +377,7 @@ impl Printer {
                 // Shouldnt be able to get here
                 _ => {
                     let text = x.text().await.unwrap();
-                    panic!("wut: {}", text);
+                    unreachable!("wut: {}", text);
                 }
             },
         }
@@ -434,7 +419,7 @@ impl Printer {
                 // Shouldnt be able to get here
                 _ => {
                     let text = x.text().await.unwrap();
-                    panic!("wut: {}", text);
+                    unreachable!("wut: {}", text);
                 }
             },
         }
@@ -594,5 +579,5 @@ impl Printer {
                 }
             }
         }
-    } 
+    }
 }
