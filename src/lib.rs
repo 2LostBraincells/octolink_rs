@@ -518,5 +518,5 @@ impl Printer {
         }
     }
 
-    
+
 }

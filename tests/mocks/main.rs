@@ -118,8 +118,10 @@ async fn get_file() {
 
     let file = printer
         .get_file(types::FileFetchDescriptor {
-            location: types::FileLocation::Local,
-            path: "/folder/printed.gcode".to_string(),
+            path: types::PathDescriptor {
+                location: types::FileLocation::Local,
+                path: "/folder/printed.gcode".to_string(),
+            },
             recursive: false,
             force: false,
         })

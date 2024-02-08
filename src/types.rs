@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+
 //
 //  INFO: HELPER STRUCTS
 //
@@ -277,7 +278,7 @@ pub mod printer_files {
             size: Option<u64>,
             refs: Option<Refs>,
             #[serde(rename = "gcodeAnalysis")]
-            gcode_analysis: Option<GcodeAnalysis>,
+            gcode_analysis: Option<GCodeAnalysis>,
             print: Option<PrintHistory>,
             statistics: Option<Statistics>,
         },
@@ -305,14 +306,15 @@ pub mod printer_files {
     }
 
     #[derive(Serialize, Deserialize, Debug)]
-    pub struct GcodeAnalysis {
+    pub struct GCodeAnalysis {
         #[serde(rename = "estimatedPrintTime")]
         estimated_print_time: Option<f32>,
-        filament: Option<FilamentTool>,
         dimensions: Option<Dimension>,
         printing_area: Option<GCodeAnalysisArea>,
         travel_area: Option<GCodeAnalysisArea>,
         travel_dimensions: Option<Dimension>,
+        #[serde(flatten)]
+        filament: GCodeAnalysisTools
     }
 
     #[derive(Serialize, Deserialize, Debug)]
@@ -332,14 +334,9 @@ pub mod printer_files {
     }
 
     #[derive(Serialize, Deserialize, Debug)]
-    pub struct GCodeAnalysisTool {
-        length: f32,
-        volume: f32,
-    }
-
-    #[derive(Serialize, Deserialize, Debug)]
     pub struct GCodeAnalysisTools {
-        tool0: GCodeAnalysisTool,
+        #[serde(flatten)]
+        tools: HashMap<String, FilamentTool>,
     }
 
     #[derive(Serialize, Deserialize, Debug)]
@@ -449,3 +446,20 @@ pub struct JobProgress {
     #[serde(rename = "printTimeOrigin")]
     print_time_origin: Option<String>,
 }
+
+//
+//  INFO: PRINTER
+//
+
+//#[derive(Serialize, Deserialize, Debug)]
+//pub struct RawPrinter {
+//    pub temperature: PrinterTemperature,
+//    pub sd: SdState,
+//    state: PrinterState,
+//}
+//
+//#[derive(Serialize, Deserialize, Debug)]
+//pub struct PrinterTemperature {
+//    Vec<ToolTemperature>,
+//    history: Vec<Printertemperaturehistory>,
+//}
