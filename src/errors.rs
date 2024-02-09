@@ -52,3 +52,9 @@ pub enum PrinterCommandError {
     ParseError(String),
     Conflict(String),
 }
+
+pub enum ToolCommandError {
+    ReqwestError(ReqwestError),
+    BadRequest(String),
+    Conflict(String),
+}

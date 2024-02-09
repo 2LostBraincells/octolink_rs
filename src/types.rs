@@ -275,7 +275,7 @@ pub mod printer_files {
             hash: Option<String>,
             size: Option<u64>,
             refs: Option<Refs>,
-            gcode_analysis: Option<GCodeAnalysis>,
+            gcode_analysis: Option<Box<GCodeAnalysis>>,
             print: Option<PrintHistory>,
             statistics: Option<Statistics>,
         },
@@ -492,4 +492,84 @@ pub struct PrinterStateFlags {
     pub error: bool,
     pub ready: bool,
     pub closed_or_error: bool,
+}
+
+//
+//  INFO: PRINTER TOOLS
+//
+
+#[derive(Serialize, Deserialize, Debug)]
+pub enum PrintheadMoveDescriptor {
+    Home {
+        x: bool,
+        y: bool,
+        z: bool,
+    },
+    Relative {
+        x: f32,
+        y: f32,
+        z: f32,
+    },
+}
+
+impl PrintheadMoveDescriptor {
+    pub const HOME_ALL: PrintheadMoveDescriptor = PrintheadMoveDescriptor::Home {
+        x: true,
+        y: true,
+        z: true,
+    };
+
+    pub fn to_post(&self) -> PrintheadCommand {
+        match self {
+            PrintheadMoveDescriptor::Home { x, y, z } => {
+                let mut axes = vec![];
+                if *x { axes.push("x".to_string()); }
+                if *y { axes.push("y".to_string()); }
+                if *z { axes.push("z".to_string()); }
+
+                PrintheadCommand {
+                    command: "home".to_string(),
+                    x: None,
+                    y: None,
+                    z: None,
+                    axes: Some(axes),
+                    factor: None,
+                }
+            },
+            PrintheadMoveDescriptor::Relative { x, y, z } => {
+                PrintheadCommand {
+                    command: "jog".to_string(),
+                    x: Some(*x),
+                    y: Some(*y),
+                    z: Some(*z),
+                    axes: None,
+                    factor: None,
+                }
+            },
+        }
+    }
+
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PrintheadCommand {
+    command: String,
+    x: Option<f32>,
+    y: Option<f32>,
+    z: Option<f32>,
+    axes: Option<Vec<String>>,
+    factor: Option<f32>,
+}
+
+impl PrintheadCommand {
+    pub fn from_feedrate(factor: f32) -> PrintheadCommand {
+        PrintheadCommand {
+            command: "feedrate".to_string(),
+            x: None,
+            y: None,
+            z: None,
+            axes: None,
+            factor: Some(factor),
+        }
+    }
 }

@@ -1,5 +1,5 @@
 use errors::*;
-use reqwest::{Client, StatusCode, Response};
+use reqwest::{Client, StatusCode};
 use types::*;
 
 pub mod errors;
@@ -73,11 +73,10 @@ impl Printer {
             .send()
             .await;
 
-        Ok(res
-            .map_err(InformationRequestError::ReqwestError)?
+        res.map_err(InformationRequestError::ReqwestError)?
             .json::<types::ApiVersion>()
             .await
-            .map_err(|e| InformationRequestError::ParseError(e.to_string()))?)
+            .map_err(|e| InformationRequestError::ParseError(e.to_string()))
     }
 
     //
@@ -103,11 +102,10 @@ impl Printer {
             .send()
             .await;
 
-        Ok(res
-            .map_err(InformationRequestError::ReqwestError)?
+        res.map_err(InformationRequestError::ReqwestError)?
             .json::<types::PrinterConnection>()
             .await
-            .map_err(|e| InformationRequestError::ParseError(e.to_string()))?)
+            .map_err(|e| InformationRequestError::ParseError(e.to_string()))
     }
 
     /// Set the connection settings of the printer
@@ -176,7 +174,8 @@ impl Printer {
             }
         } else if files_descriptor.recursive {
             "?recursive=true"
-        } else { ""
+        } else {
+            ""
         };
 
         let url = format!(
@@ -574,10 +573,132 @@ impl Printer {
                 let deserialized = serde_path_to_error::deserialize(result);
 
                 match deserialized {
-                    Err(e) => panic!("wut: {}", e.to_string()),
+                    Err(e) => panic!("wut: {}", e),
                     Ok(x) => Ok(x),
                 }
             }
         }
+    }
+
+    /// Moves the printhead to the specified location
+    ///
+    /// # Arguments
+    ///
+    /// `command` - A [`PrintheadMoveDescriptor`](types::PrintheadMoveDescriptor) representing the location to move the printhead to.
+    /// This can be one of two things:
+    /// * `relative` - A struct representing the relative location to move the printhead to.
+    /// * `home` - A struct representing which axes will home.
+    ///
+    /// # Errors
+    ///
+    /// If there is an error, it will return a [`PrintheadMoveError`](errors::PrintheadMoveError) enum.
+    /// * `ReqwestError` - If the request fails
+    /// * `BadRequest` - If the server responds with a `400` status code. Can happen if you give
+    /// it implossible values.
+    /// * `Conflict` - If the server responds with a `409` status code. This means the printer is
+    /// currently printing.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use octoprint_rs::PrinterBuilder;
+    ///
+    pub async fn move_printhead(
+        &self,
+        command: types::PrintheadMoveDescriptor,
+    ) -> Result<(), ToolCommandError> {
+        let url = format!(
+            "http://{}:{}/api/printer/printhead",
+            self.address, self.port
+        );
+
+        let res = self
+            .client
+            .post(&url)
+            .header("X-Api-Key", &self.api_key)
+            .json(&command.to_post())
+            .send()
+            .await;
+
+        match res {
+            Err(e) => Err(ToolCommandError::ReqwestError(e)),
+            Ok(x) => match x.status() {
+                StatusCode::NO_CONTENT => Ok(()),
+                StatusCode::BAD_REQUEST => {
+                    let text = x.text().await.unwrap();
+                    Err(ToolCommandError::BadRequest(text))
+                }
+                StatusCode::CONFLICT => {
+                    let text = x.text().await.unwrap();
+                    Err(ToolCommandError::Conflict(text))
+                }
+                // Shouldnt be able to get here
+                _ => {
+                    let text = x.text().await.unwrap();
+                    unreachable!("wut: {}", text);
+                }
+            },
+        }
+    }
+
+    /// Changes the feedrate of the printhead.
+    ///
+    /// # Arguments
+    ///
+    /// `factor` - A `f32` representing the factor to change the feedrate by. This will always be
+    /// relative to 1.0 or 100%.
+    /// This can be between `0.5` and `2.0`.
+    ///
+    /// # Errors
+    ///
+    /// If there is an error, it will return a [`PrintheadCommandError`](errors::PrintheadCommandError) enum.
+    /// * `ReqwestError` - If the request fails
+    /// * `BadRequest` - If the server responds with a `400` StatusCode. This means you didnt give
+    /// it the a valid factor.
+    /// * `Conflict` - If the server responds with a `409` StatusCode. This means the printer is
+    /// currently printing
+    pub async fn change_printhead_feedrate(&self, factor: f32) -> Result<(), ToolCommandError> {
+        if factor < 0.5 || factor > 2.0 {
+            return Err(ToolCommandError::BadRequest(
+                "Feedrate factor must be between 0.5 and 2.0".to_string(),
+            ));
+        }
+
+        let url = format!(
+            "http://{}:{}/api/printer/printhead",
+            self.address, self.port
+        );
+
+        let res = self
+            .client
+            .post(&url)
+            .header("X-Api-Key", &self.api_key)
+            .json(&types::PrintheadCommand::from_feedrate(factor))
+            .send()
+            .await;
+
+        match res {
+            Err(e) => Err(ToolCommandError::ReqwestError(e)),
+            Ok(x) => match x.status() {
+                StatusCode::NO_CONTENT => Ok(()),
+                StatusCode::BAD_REQUEST => {
+                    let text = x.text().await.unwrap();
+                    Err(ToolCommandError::BadRequest(text)) // How did you manage?
+                }
+                StatusCode::CONFLICT => {
+                    let text = x.text().await.unwrap();
+                    Err(ToolCommandError::Conflict(text))
+                }
+                // Shouldnt be able to get here
+                _ => {
+                    let text = x.text().await.unwrap();
+                    unreachable!("wut: {}", text);
+                }
+            },
+        }
+    }
+
+    pub async fn move_tool(&self, command: ToolMoveDescriptor) -> Result<(), ToolCommandError> {
+        
     }
 }
