@@ -1,3 +1,5 @@
+use std::os::unix::fs::FileTypeExt;
+
 use errors::*;
 use reqwest::{Client, StatusCode};
 use types::*;
@@ -132,13 +134,15 @@ impl Printer {
             .send()
             .await;
 
-        match res {
-            Err(e) => Err(SetConnectionError::ReqwestError(e)),
-            Ok(x) if !x.status().is_success() => {
-                let text = x.text().await.unwrap();
-                Err(SetConnectionError::BadRequest(text))
-            }
-            _ => Ok(()),
+        let body = res.map_err(|e| SetConnectionError::ReqwestError(e))?;
+        if body.status().is_success() {
+            Ok(())
+        } else {
+            let text = body
+                .text()
+                .await
+                .map_err(|e| SetConnectionError::ReqwestError(e))?;
+            Err(SetConnectionError::BadRequest(text))
         }
     }
 
@@ -192,23 +196,19 @@ impl Printer {
             .send()
             .await;
 
-        match res {
-            Err(e) => Err(FileRequestError::ReqwestError(e)),
-            Ok(x) => {
-                if !x.status().is_success() {
-                    let text = x.text().await.unwrap();
-                    return Err(FileRequestError::ParseError(text));
-                }
-
-                let text = x.text().await.unwrap();
-                let result = &mut serde_json::Deserializer::from_str(text.as_str());
-                let deserialized = serde_path_to_error::deserialize(result);
-
-                match deserialized {
-                    Err(err) => Err(FileRequestError::ParseError(err.to_string())),
-                    Ok(x) => Ok(x),
-                }
-            }
+        let body = res.map_err(|e| FileRequestError::ReqwestError(e))?;
+        let status = body.status();
+        let text = body
+            .text()
+            .await
+            .map_err(|e| FileRequestError::ReqwestError(e))?;
+        if status.is_success() {
+            let result = &mut serde_json::Deserializer::from_str(text.as_str());
+            let deserialized = serde_path_to_error::deserialize(result)
+                .map_err(|e| FileRequestError::ParseError(e.to_string()))?;
+            Ok(deserialized)
+        } else {
+            Err(FileRequestError::ParseError(text))
         }
     }
 
@@ -261,8 +261,6 @@ impl Printer {
             self.address, self.port, location, path, query_params,
         );
 
-        dbg!(&url);
-
         let res = self
             .client
             .get(&url)
@@ -270,22 +268,21 @@ impl Printer {
             .send()
             .await;
 
-        match res {
-            Err(e) => Err(FileRequestError::ReqwestError(e)),
-            Ok(x) => {
-                if x.status() == StatusCode::NOT_FOUND {
-                    let text = x.text().await.unwrap();
-                    return Err(FileRequestError::NotFound(text));
-                }
+        let body = res.map_err(|e| FileRequestError::ReqwestError(e))?;
+        let status = body.status();
 
-                let text = x.text().await.unwrap();
+        let text = body
+            .text()
+            .await
+            .map_err(|e| FileRequestError::ReqwestError(e))?;
+        match status {
+            StatusCode::NOT_FOUND => Err(FileRequestError::NotFound(text)),
+            StatusCode::INTERNAL_SERVER_ERROR => Err(FileRequestError::ServerError),
+            _ => {
                 let result = &mut serde_json::Deserializer::from_str(text.as_str());
-                let deserialized = serde_path_to_error::deserialize(result);
-
-                match deserialized {
-                    Err(err) => Err(FileRequestError::ParseError(err.to_string())),
-                    Ok(x) => Ok(x),
-                }
+                let deserialized = serde_path_to_error::deserialize(result)
+                    .map_err(|e| FileRequestError::ParseError(e.to_string()))?;
+                Ok(deserialized)
             }
         }
     }
@@ -333,6 +330,7 @@ impl Printer {
         &self,
         command: types::FileCommandDescriptor,
     ) -> Result<(), FileCommandError> {
+        // format url
         let location = match command.path.location {
             types::FileLocation::Local => "local/",
             types::FileLocation::Sdcard => "sdcard/",
@@ -357,28 +355,25 @@ impl Printer {
             .send()
             .await;
 
-        match res {
-            Err(e) => Err(FileCommandError::ReqwestError(e)),
-            Ok(x) => match x.status() {
-                StatusCode::CREATED | StatusCode::NO_CONTENT => Ok(()),
-                StatusCode::BAD_REQUEST => {
-                    let text = x.text().await.unwrap();
-                    Err(FileCommandError::BadRequest(text))
-                }
-                StatusCode::INTERNAL_SERVER_ERROR => {
-                    let text = x.text().await.unwrap();
-                    Err(FileCommandError::BadRequest(text))
-                }
-                StatusCode::CONFLICT => {
-                    let text = x.text().await.unwrap();
-                    Err(FileCommandError::Conflict(text))
-                }
-                // Shouldnt be able to get here
-                _ => {
-                    let text = x.text().await.unwrap();
-                    unreachable!("wut: {}", text);
-                }
-            },
+        let body = res.map_err(|e| FileCommandError::ReqwestError(e))?;
+        let status = body.status();
+
+        // Handle success case
+        if status.is_success() {
+            return Ok(());
+        }
+
+        // Handle error case
+        let text = body
+            .text()
+            .await
+            .map_err(|e| FileCommandError::ReqwestError(e))?;
+        match status {
+            StatusCode::INTERNAL_SERVER_ERROR | StatusCode::BAD_REQUEST => {
+                Err(FileCommandError::BadRequest(text))
+            }
+            StatusCode::CONFLICT => Err(FileCommandError::Conflict(text)),
+            _ => unreachable!(),
         }
     }
 
@@ -403,24 +398,24 @@ impl Printer {
             .send()
             .await;
 
-        match res {
-            Err(e) => Err(FileDeletionError::ReqwestError(e)),
-            Ok(x) => match x.status() {
-                StatusCode::NO_CONTENT => Ok(()),
-                StatusCode::NOT_FOUND => {
-                    let text = x.text().await.unwrap();
-                    Err(FileDeletionError::NotFound(text))
-                }
-                StatusCode::CONFLICT => {
-                    let text = x.text().await.unwrap();
-                    Err(FileDeletionError::Conflict(text))
-                }
-                // Shouldnt be able to get here
-                _ => {
-                    let text = x.text().await.unwrap();
-                    unreachable!("wut: {}", text);
-                }
-            },
+        let body = res.map_err(|e| FileDeletionError::ReqwestError(e))?;
+        let status = body.status();
+
+        // Handle success case
+        if status.is_success() {
+            return Ok(());
+        }
+
+        // Handle error case
+        let text = body
+            .text()
+            .await
+            .map_err(|e| FileDeletionError::ReqwestError(e))?;
+        match status {
+            StatusCode::NOT_FOUND => Err(FileDeletionError::NotFound(text)),
+            StatusCode::CONFLICT => Err(FileDeletionError::Conflict(text)),
+            StatusCode::INTERNAL_SERVER_ERROR => Err(FileDeletionError::ServerError),
+            _ => unreachable!(),
         }
     }
 
@@ -452,20 +447,18 @@ impl Printer {
             .send()
             .await;
 
-        match res {
-            Err(e) => Err(JobCommandError::ReqwestError(e)),
-            Ok(x) => match x.status() {
-                StatusCode::NO_CONTENT => Ok(()),
-                StatusCode::CONFLICT => {
-                    let text = x.text().await.unwrap();
-                    Err(JobCommandError::Conflict(text))
-                }
-                // Shouldnt be able to get here
-                _ => {
-                    let text = x.text().await.unwrap();
-                    panic!("wut: {}", text);
-                }
-            },
+        let body = res.map_err(|e| JobCommandError::ReqwestError(e))?;
+        match body.status() {
+            StatusCode::NO_CONTENT => Ok(()),
+            StatusCode::INTERNAL_SERVER_ERROR => Err(JobCommandError::ServerError),
+            StatusCode::CONFLICT => {
+                let text = body
+                    .text()
+                    .await
+                    .map_err(|e| JobCommandError::ReqwestError(e))?;
+                Err(JobCommandError::Conflict(text))
+            }
+            _ => unreachable!(),
         }
     }
 
@@ -506,19 +499,15 @@ impl Printer {
             .send()
             .await;
 
-        match res {
-            Err(e) => Err(InformationRequestError::ReqwestError(e)),
-            Ok(x) => {
-                let text = x.text().await.unwrap();
-                let result = &mut serde_json::Deserializer::from_str(text.as_str());
-                let deserialized = serde_path_to_error::deserialize(result);
-
-                match deserialized {
-                    Err(e) => Err(InformationRequestError::ParseError(e.to_string())),
-                    Ok(x) => Ok(x),
-                }
-            }
-        }
+        let body = res.map_err(|e| InformationRequestError::ReqwestError(e))?;
+        let text = body
+            .text()
+            .await
+            .map_err(|e| InformationRequestError::ReqwestError(e))?;
+        let result = &mut serde_json::Deserializer::from_str(text.as_str());
+        let deserialized = serde_path_to_error::deserialize(result)
+            .map_err(|e| InformationRequestError::ParseError(e.to_string()))?;
+        Ok(deserialized)
     }
 
     /// Gets the current printer telemetry.
@@ -560,22 +549,19 @@ impl Printer {
             .send()
             .await;
 
-        match res {
-            Err(e) => Err(PrinterCommandError::ReqwestError(e)),
-            Ok(x) => {
-                if x.status() == StatusCode::CONFLICT {
-                    let text = x.text().await.unwrap();
-                    return Err(PrinterCommandError::Conflict(text));
-                }
-
-                let text = x.text().await.unwrap();
+        let body = res.map_err(|e| PrinterCommandError::ReqwestError(e))?;
+        let status = body.status();
+        let text = body
+            .text()
+            .await
+            .map_err(|e| PrinterCommandError::ReqwestError(e))?;
+        match status {
+            StatusCode::INTERNAL_SERVER_ERROR => Err(PrinterCommandError::ServerError),
+            StatusCode::CONFLICT => Err(PrinterCommandError::Conflict(text)),
+            _ => {
                 let result = &mut serde_json::Deserializer::from_str(text.as_str());
                 let deserialized = serde_path_to_error::deserialize(result);
-
-                match deserialized {
-                    Err(e) => panic!("wut: {}", e),
-                    Ok(x) => Ok(x),
-                }
+                Ok(deserialized.map_err(|e| PrinterCommandError::ParseError(e.to_string()))?)
             }
         }
     }
@@ -618,26 +604,24 @@ impl Printer {
             .header("X-Api-Key", &self.api_key)
             .json(&command.to_post())
             .send()
-            .await;
+            .await
+            .map_err(|e| ToolCommandError::ReqwestError(e))?;
 
-        match res {
-            Err(e) => Err(ToolCommandError::ReqwestError(e)),
-            Ok(x) => match x.status() {
-                StatusCode::NO_CONTENT => Ok(()),
-                StatusCode::BAD_REQUEST => {
-                    let text = x.text().await.unwrap();
-                    Err(ToolCommandError::BadRequest(text))
-                }
-                StatusCode::CONFLICT => {
-                    let text = x.text().await.unwrap();
-                    Err(ToolCommandError::Conflict(text))
-                }
-                // Shouldnt be able to get here
-                _ => {
-                    let text = x.text().await.unwrap();
-                    unreachable!("wut: {}", text);
-                }
-            },
+        match res.status() {
+            StatusCode::NO_CONTENT => Ok(()),
+            status @ StatusCode::BAD_REQUEST | status @ StatusCode::CONFLICT => {
+                let text = res
+                    .text()
+                    .await
+                    .map_err(|e| ToolCommandError::ReqwestError(e))?;
+                Err(match status {
+                    StatusCode::BAD_REQUEST => ToolCommandError::BadRequest(text),
+                    StatusCode::CONFLICT => ToolCommandError::Conflict(text),
+                    _ => unreachable!(),
+                })
+            }
+            StatusCode::INTERNAL_SERVER_ERROR => Err(ToolCommandError::ServerError),
+            _ => unreachable!(),
         }
     }
 
@@ -675,30 +659,44 @@ impl Printer {
             .header("X-Api-Key", &self.api_key)
             .json(&types::PrintheadCommand::from_feedrate(factor))
             .send()
-            .await;
+            .await
+            .map_err(|e| ToolCommandError::ReqwestError(e))?;
 
-        match res {
-            Err(e) => Err(ToolCommandError::ReqwestError(e)),
-            Ok(x) => match x.status() {
-                StatusCode::NO_CONTENT => Ok(()),
-                StatusCode::BAD_REQUEST => {
-                    let text = x.text().await.unwrap();
-                    Err(ToolCommandError::BadRequest(text)) // How did you manage?
+        match res.status() {
+            StatusCode::NO_CONTENT => Ok(()),
+            StatusCode::INTERNAL_SERVER_ERROR => Err(ToolCommandError::ServerError),
+            status @ StatusCode::BAD_REQUEST | status @ StatusCode::CONFLICT => {
+                let text = res
+                    .text()
+                    .await
+                    .map_err(|e| ToolCommandError::ReqwestError(e))?;
+                match status {
+                    StatusCode::BAD_REQUEST => Err(ToolCommandError::BadRequest(text)),
+                    StatusCode::CONFLICT => Err(ToolCommandError::Conflict(text)),
+                    _ => unreachable!(),
                 }
-                StatusCode::CONFLICT => {
-                    let text = x.text().await.unwrap();
-                    Err(ToolCommandError::Conflict(text))
-                }
-                // Shouldnt be able to get here
-                _ => {
-                    let text = x.text().await.unwrap();
-                    unreachable!("wut: {}", text);
-                }
-            },
+            }
+            _ => unreachable!(),
         }
+
+        // match res {
+        //     Err(e) => Err(ToolCommandError::ReqwestError(e)),
+        //     Ok(x) => match x.status() {
+        //         StatusCode::NO_CONTENT => Ok(()),
+        //         StatusCode::BAD_REQUEST => {
+        //             let text = x.text().await.unwrap();
+        //             Err(ToolCommandError::BadRequest(text)) // How did you manage?
+        //         }
+        //         StatusCode::CONFLICT => {
+        //             let text = x.text().await.unwrap();
+        //             Err(ToolCommandError::Conflict(text))
+        //         }
+        //         StatusCode::INTERNAL_SERVER_ERROR => Err(ToolCommandError::ServerError),
+        //         // Shouldnt be able to get here
+        //         _ => {}
+        //     },
+        // }
     }
 
-    pub async fn move_tool(&self, command: ToolMoveDescriptor) -> Result<(), ToolCommandError> {
-        
-    }
+    // pub async fn move_tool(&self, command: ToolCommandDescriptor) -> Result<(), ToolCommandError> {}
 }

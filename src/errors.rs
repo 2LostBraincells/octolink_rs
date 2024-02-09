@@ -3,12 +3,14 @@ use reqwest::Error as ReqwestError;
 /// If you receive an InvalidResponse error, it means that this wrapper is outdated.
 #[derive(Debug)]
 pub enum InformationRequestError {
+    ServerError,
     ReqwestError(ReqwestError),
     ParseError(String),
 }
 
 #[derive(Debug)]
 pub enum SetConnectionError {
+    ServerError,
     ReqwestError(ReqwestError),
     BadRequest(String),
 }
@@ -16,6 +18,7 @@ pub enum SetConnectionError {
 /// If you receive an InvalidResponse error, it means that this wrapper is outdated.
 #[derive(Debug)]
 pub enum FileRequestError {
+    ServerError,
     ReqwestError(ReqwestError),
     ParseError(String),
     NotFound(String)
@@ -29,6 +32,7 @@ pub enum FileRequestError {
 ///     your destination path. 
 #[derive(Debug)]
 pub enum FileCommandError {
+    ServerError,
     ReqwestError(ReqwestError),
     Conflict(String),
     BadRequest(String),
@@ -36,6 +40,7 @@ pub enum FileCommandError {
 
 #[derive(Debug)]
 pub enum FileDeletionError {
+    ServerError,
     ReqwestError(ReqwestError),
     NotFound(String),
     Conflict(String),
@@ -43,17 +48,22 @@ pub enum FileDeletionError {
 
 #[derive(Debug)]
 pub enum JobCommandError {
+    ServerError,
     ReqwestError(ReqwestError),
     Conflict(String),
 }
 
+#[derive(Debug)]
 pub enum PrinterCommandError {
+    ServerError,
     ReqwestError(ReqwestError),
     ParseError(String),
     Conflict(String),
 }
 
+#[derive(Debug)]
 pub enum ToolCommandError {
+    ServerError,
     ReqwestError(ReqwestError),
     BadRequest(String),
     Conflict(String),

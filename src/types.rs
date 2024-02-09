@@ -573,3 +573,38 @@ impl PrintheadCommand {
         }
     }
 }
+
+#[derive(Serialize, Deserialize, Debug)]
+pub enum ToolCommandDescriptor {
+    Target {
+        tool: String,
+        temperature: f32,
+    },
+    Offset {
+        tool: String,
+        offset: f32,
+    },
+    /// Selects the tool for extrusion.
+    Select {
+        tool: String,
+    },
+    Extrude {
+        amount: f32,
+    },
+    /// `amount`: The amount to retract. Will do the same thing as `Extrude` but with a negative amount.
+    Retract {
+        amount: f32,
+    }, 
+    Flowrate {
+        factor: f32,
+    },
+}
+
+pub struct ToolCommand {
+    pub command: String,
+    pub tool: Option<String>,
+    pub temperature: Option<f32>,
+    pub offset: Option<f32>,
+    pub amount: Option<f32>,
+    pub factor: Option<f32>,
+}
