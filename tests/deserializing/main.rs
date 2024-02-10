@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use octoprint_rs::types::{printer_files::Entry, PrinterTemperature, TemperatureHistoryEntry};
+use octoprint_rs::types::{printer_files::Entry, ToolState, TemperatureHistoryEntry};
 
 #[test]
 fn parse_file() {
@@ -338,7 +338,7 @@ fn parse_printer_temperatire() {
     let result = &mut serde_json::Deserializer::from_str(json);
     let deserialized = serde_path_to_error::deserialize(result);
 
-    let temperatures: PrinterTemperature = deserialized.unwrap(); 
+    let temperatures: ToolState = deserialized.unwrap(); 
 
     assert_eq!(temperatures.tools.get("tool0").unwrap().actual, 214.8821);
     assert_eq!(temperatures.tools.get("tool1").unwrap().actual, 25.3);

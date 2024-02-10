@@ -1,7 +1,6 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, iter::zip};
 
 use serde::{Deserialize, Serialize};
-
 
 //
 //  INFO: HELPER STRUCTS
@@ -443,7 +442,7 @@ pub struct JobProgress {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct RawPrinter {
-    pub temperature: PrinterTemperature,
+    pub temperature: ToolState,
     pub sd: SdState,
     pub state: PrinterState,
 }
@@ -453,13 +452,6 @@ pub struct PrinterTool {
     pub actual: f32,
     pub target: Option<f32>,
     pub offset: Option<f32>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct PrinterTemperature {
-    pub history: Vec<TemperatureHistoryEntry>,
-    #[serde(flatten)]
-    pub tools: HashMap<String, PrinterTool>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -495,21 +487,13 @@ pub struct PrinterStateFlags {
 }
 
 //
-//  INFO: PRINTER TOOLS
+//  INFO: PRINTHEAD
 //
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum PrintheadMoveDescriptor {
-    Home {
-        x: bool,
-        y: bool,
-        z: bool,
-    },
-    Relative {
-        x: f32,
-        y: f32,
-        z: f32,
-    },
+    Home { x: bool, y: bool, z: bool },
+    Relative { x: f32, y: f32, z: f32 },
 }
 
 impl PrintheadMoveDescriptor {
@@ -523,9 +507,15 @@ impl PrintheadMoveDescriptor {
         match self {
             PrintheadMoveDescriptor::Home { x, y, z } => {
                 let mut axes = vec![];
-                if *x { axes.push("x".to_string()); }
-                if *y { axes.push("y".to_string()); }
-                if *z { axes.push("z".to_string()); }
+                if *x {
+                    axes.push("x".to_string());
+                }
+                if *y {
+                    axes.push("y".to_string());
+                }
+                if *z {
+                    axes.push("z".to_string());
+                }
 
                 PrintheadCommand {
                     command: "home".to_string(),
@@ -535,20 +525,17 @@ impl PrintheadMoveDescriptor {
                     axes: Some(axes),
                     factor: None,
                 }
-            },
-            PrintheadMoveDescriptor::Relative { x, y, z } => {
-                PrintheadCommand {
-                    command: "jog".to_string(),
-                    x: Some(*x),
-                    y: Some(*y),
-                    z: Some(*z),
-                    axes: None,
-                    factor: None,
-                }
+            }
+            PrintheadMoveDescriptor::Relative { x, y, z } => PrintheadCommand {
+                command: "jog".to_string(),
+                x: Some(*x),
+                y: Some(*y),
+                z: Some(*z),
+                axes: None,
+                factor: None,
             },
         }
     }
-
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -574,37 +561,115 @@ impl PrintheadCommand {
     }
 }
 
+// 
+//  NOTE: TOOL TEMP
+//
+
 #[derive(Serialize, Deserialize, Debug)]
-pub enum ToolCommandDescriptor {
-    Target {
-        tool: String,
-        temperature: f32,
-    },
-    Offset {
-        tool: String,
-        offset: f32,
-    },
-    /// Selects the tool for extrusion.
+pub enum ToolTempDescriptor {
+    Target { tool: String, temperature: f32 },
+    Offset { tool: String, amount: f32 },
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ToolTempCommand {
+    command: String,
+    targets: Option<HashMap<String, f32>>,
+    offsets: Option<HashMap<String, f32>>,
+}
+
+impl ToolTempDescriptor {
+    pub fn to_json(self) -> ToolTempCommand {
+        match self {
+            Self::Target { tool, temperature } => ToolTempCommand {
+                command: "target".to_string(),
+                targets: Some(zip(std::iter::once(tool), std::iter::once(temperature))
+                    .collect::<HashMap<_, _>>()),
+                offsets: None
+            },
+            Self::Offset { tool, amount } => ToolTempCommand {
+                command: "offset".to_string(),
+                offsets: Some(zip(std::iter::once(tool), std::iter::once(amount))
+                    .collect::<HashMap<_, _>>()),
+                targets: None
+            }
+        }
+    }
+}
+
+
+//
+// NOTE: TOOL STATE
+//
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ToolState {
+    pub history: Option<Vec<TemperatureHistoryEntry>>,
+    #[serde(flatten)]
+    pub tools: HashMap<String, PrinterTool>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub enum ToolCommand {
     Select {
+        command: String,
         tool: String,
     },
     Extrude {
+        command: String,
         amount: f32,
     },
-    /// `amount`: The amount to retract. Will do the same thing as `Extrude` but with a negative amount.
-    Retract {
-        amount: f32,
-    }, 
     Flowrate {
+        command: String,
         factor: f32,
     },
 }
 
-pub struct ToolCommand {
-    pub command: String,
-    pub tool: Option<String>,
-    pub temperature: Option<f32>,
-    pub offset: Option<f32>,
-    pub amount: Option<f32>,
-    pub factor: Option<f32>,
+// 
+//  NOTE: BED COMMAND
+//
+
+pub enum BedTempDescriptor {
+    Target {
+        target: f32,
+    },
+    Offset {
+        amount: f32
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct BedTempCommand {
+    command: String,
+    offset: Option<f32>,
+    target: Option<f32>
+}
+
+impl BedTempDescriptor {
+    pub fn to_json(self) -> BedTempCommand {
+        match self {
+            Self::Target { target } => BedTempCommand {
+                command: "target".to_string(),
+                target: Some(target),
+                offset: None,
+            },
+            Self::Offset { amount } => BedTempCommand {
+                command: "target".to_string(),
+                target: None,
+                offset: Some(amount)
+            }
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct BedTemperatureHistoryEntry {
+    time: u64,
+    bed: PrinterTool
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct BedState {
+    pub history: Option<Vec<BedTemperatureHistoryEntry>>,
+    pub bed: PrinterTool,
 }

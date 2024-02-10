@@ -54,7 +54,7 @@ pub enum JobCommandError {
 }
 
 #[derive(Debug)]
-pub enum PrinterCommandError {
+pub enum DeviceStateError {
     ServerError,
     ReqwestError(ReqwestError),
     ParseError(String),

@@ -68,8 +68,7 @@ impl Printer {
 
         dbg!(&url);
 
-        let res = self
-            .client
+        let res = self .client
             .get(&url)
             .header("X-Api-Key", &self.api_key)
             .send()
@@ -198,18 +197,23 @@ impl Printer {
 
         let body = res.map_err(|e| FileRequestError::ReqwestError(e))?;
         let status = body.status();
+
+        if status.is_server_error() {
+            return Err(FileRequestError::ServerError);
+        }
+
         let text = body
             .text()
             .await
             .map_err(|e| FileRequestError::ReqwestError(e))?;
+
         if status.is_success() {
             let result = &mut serde_json::Deserializer::from_str(text.as_str());
             let deserialized = serde_path_to_error::deserialize(result)
                 .map_err(|e| FileRequestError::ParseError(e.to_string()))?;
-            Ok(deserialized)
-        } else {
-            Err(FileRequestError::ParseError(text))
+            return Ok(deserialized);
         }
+        Err(FileRequestError::NotFound(text))
     }
 
     //  TODO: Make file uploads work
@@ -500,6 +504,10 @@ impl Printer {
             .await;
 
         let body = res.map_err(|e| InformationRequestError::ReqwestError(e))?;
+        if body.status().is_server_error() {
+            return Err(InformationRequestError::ServerError);
+        }
+
         let text = body
             .text()
             .await
@@ -509,6 +517,10 @@ impl Printer {
             .map_err(|e| InformationRequestError::ParseError(e.to_string()))?;
         Ok(deserialized)
     }
+
+    // 
+    //  NOTE: PRINTER COMMANDS
+    //  
 
     /// Gets the current printer telemetry.
     ///
@@ -539,7 +551,7 @@ impl Printer {
     ///     .get_printer_telemetry()
     ///     .await;
     /// # }
-    pub async fn get_printer_telemetry(&self) -> Result<types::RawPrinter, PrinterCommandError> {
+    pub async fn get_printer_telemetry(&self) -> Result<types::RawPrinter, DeviceStateError> {
         let url = format!("http://{}:{}/api/printer", self.address, self.port);
 
         let res = self
@@ -549,22 +561,27 @@ impl Printer {
             .send()
             .await;
 
-        let body = res.map_err(|e| PrinterCommandError::ReqwestError(e))?;
+        let body = res.map_err(|e| DeviceStateError::ReqwestError(e))?;
         let status = body.status();
         let text = body
             .text()
             .await
-            .map_err(|e| PrinterCommandError::ReqwestError(e))?;
+            .map_err(|e| DeviceStateError::ReqwestError(e))?;
         match status {
-            StatusCode::INTERNAL_SERVER_ERROR => Err(PrinterCommandError::ServerError),
-            StatusCode::CONFLICT => Err(PrinterCommandError::Conflict(text)),
+            StatusCode::INTERNAL_SERVER_ERROR => Err(DeviceStateError::ServerError),
+            StatusCode::CONFLICT => Err(DeviceStateError::Conflict(text)),
             _ => {
                 let result = &mut serde_json::Deserializer::from_str(text.as_str());
-                let deserialized = serde_path_to_error::deserialize(result);
-                Ok(deserialized.map_err(|e| PrinterCommandError::ParseError(e.to_string()))?)
+                let deserialized = serde_path_to_error::deserialize(result)
+                    .map_err(|e| DeviceStateError::ParseError(e.to_string()))?;
+                Ok(deserialized)
             }
         }
     }
+
+    // 
+    //  NOTE: PRINTHEAD COMMANDS
+    //
 
     /// Moves the printhead to the specified location
     ///
@@ -609,6 +626,7 @@ impl Printer {
 
         match res.status() {
             StatusCode::NO_CONTENT => Ok(()),
+            StatusCode::INTERNAL_SERVER_ERROR => Err(ToolCommandError::ServerError),
             status @ StatusCode::BAD_REQUEST | status @ StatusCode::CONFLICT => {
                 let text = res
                     .text()
@@ -620,7 +638,6 @@ impl Printer {
                     _ => unreachable!(),
                 })
             }
-            StatusCode::INTERNAL_SERVER_ERROR => Err(ToolCommandError::ServerError),
             _ => unreachable!(),
         }
     }
@@ -670,33 +687,317 @@ impl Printer {
                     .text()
                     .await
                     .map_err(|e| ToolCommandError::ReqwestError(e))?;
-                match status {
-                    StatusCode::BAD_REQUEST => Err(ToolCommandError::BadRequest(text)),
-                    StatusCode::CONFLICT => Err(ToolCommandError::Conflict(text)),
+                Err(match status {
+                    StatusCode::BAD_REQUEST => ToolCommandError::BadRequest(text),
+                    StatusCode::CONFLICT => ToolCommandError::Conflict(text),
                     _ => unreachable!(),
-                }
+                })
             }
             _ => unreachable!(),
         }
-
-        // match res {
-        //     Err(e) => Err(ToolCommandError::ReqwestError(e)),
-        //     Ok(x) => match x.status() {
-        //         StatusCode::NO_CONTENT => Ok(()),
-        //         StatusCode::BAD_REQUEST => {
-        //             let text = x.text().await.unwrap();
-        //             Err(ToolCommandError::BadRequest(text)) // How did you manage?
-        //         }
-        //         StatusCode::CONFLICT => {
-        //             let text = x.text().await.unwrap();
-        //             Err(ToolCommandError::Conflict(text))
-        //         }
-        //         StatusCode::INTERNAL_SERVER_ERROR => Err(ToolCommandError::ServerError),
-        //         // Shouldnt be able to get here
-        //         _ => {}
-        //     },
-        // }
     }
 
-    // pub async fn move_tool(&self, command: ToolCommandDescriptor) -> Result<(), ToolCommandError> {}
+    //
+    //  NOTE: TOOL COMMANDS
+    //
+
+    /// Used to change the temperature of a specified tool.
+    /// This tools is usually called tool0 but you can get the tools by running
+    /// [`get_tool_state()`](#method.get_tool_state).
+    ///
+    /// # Arguments
+    ///
+    /// This function takes in a [`ToolTempDescriptor`](types::ToolTempDescriptor) which has two
+    /// variants, `Target` and `Offset`,
+    ///
+    /// `Offset` has two fields:
+    /// * `tool` - The target tool.
+    /// * `offset` - The amount to offset the temperature by
+    ///
+    /// `Target` has two fields:
+    /// * `tool` - The target tool.
+    /// * `target` - The target temperature.
+    pub async fn tool_temperature(
+        &self,
+        command: ToolTempDescriptor,
+    ) -> Result<(), ToolCommandError> {
+        let url = format!("http://{}:{}/api/printer/tool", &self.address, &self.port);
+
+        let res = self
+            .client
+            .post(&url)
+            .header("X-Api-Key", &self.api_key)
+            .json(&command.to_json())
+            .send()
+            .await
+            .map_err(|e| ToolCommandError::ReqwestError(e))?;
+
+        let status = res.status();
+
+        if status.is_success() {
+            return Ok(());
+        }
+        if status.is_server_error() {
+            return Err(ToolCommandError::ServerError);
+        }
+
+        let text = res
+            .text()
+            .await
+            .map_err(|e| ToolCommandError::ReqwestError(e))?;
+
+        match status {
+            StatusCode::BAD_REQUEST => Err(ToolCommandError::BadRequest(text)),
+            StatusCode::CONFLICT => Err(ToolCommandError::Conflict(text)),
+            _ => unreachable!(),
+        }
+    }
+
+    pub async fn get_tool_state(
+        &self,
+        history: Option<u32>,
+    ) -> Result<ToolState, DeviceStateError> {
+        let query: String;
+        if let Some(x) = history {
+            query = format!("true&limit={}", x);
+        } else {
+            query = "false".to_string();
+        }
+
+        let url = format!(
+            "http://{}:{}/api/printer?history={}",
+            &self.address, &self.port, query
+        );
+
+        let res = self
+            .client
+            .get(&url)
+            .header("X-Api-Key", &self.api_key)
+            .send()
+            .await
+            .map_err(|e| DeviceStateError::ReqwestError(e))?;
+
+        let status = res.status();
+        let text = res
+            .text()
+            .await
+            .map_err(|e| DeviceStateError::ReqwestError(e))?;
+
+        match status {
+            StatusCode::CONFLICT => Err(DeviceStateError::Conflict(text)),
+            status if status.is_success() => {
+                let result = &mut serde_json::Deserializer::from_str(text.as_str());
+                let deserialized = serde_path_to_error::deserialize(result)
+                    .map_err(|e| DeviceStateError::ParseError(e.to_string()))?;
+                Ok(deserialized)
+            }
+            _ => unreachable!()
+        }
+    }
+
+    pub async fn select_tool(&self, tool: String) -> Result<(), ToolCommandError> {
+        let url = format!("http://{}:{}/api/printer/tool", &self.address, &self.port);
+
+        let request = ToolCommand::Select {
+            command: "select".to_string(),
+            tool,
+        };
+
+        let res = self
+            .client
+            .post(&url)
+            .header("X-Api-Key", &self.api_key)
+            .json(&request)
+            .send()
+            .await
+            .map_err(|e| ToolCommandError::ReqwestError(e))?;
+
+        let status = res.status();
+
+        if status.is_success() {
+            return Ok(());
+        }
+        if status.is_server_error() {
+            return Err(ToolCommandError::ServerError);
+        }
+
+        let text = res
+            .text()
+            .await
+            .map_err(|e| ToolCommandError::ReqwestError(e))?;
+
+        match status {
+            StatusCode::BAD_REQUEST => Err(ToolCommandError::BadRequest(text)),
+            StatusCode::CONFLICT => Err(ToolCommandError::Conflict(text)),
+            _ => unreachable!(),
+        }
+    }
+
+    /// Extrudes using the selected tool.
+    /// use [`select_tool()`](#method.select_tool) to select a tool.
+    ///
+    /// To retract the filament, usa a negative value for the amount.
+    pub async fn extrude(&self, amount: f32) -> Result<(), ToolCommandError> {
+        let url = format!("http://{}:{}/api/printer/tool", &self.address, &self.port);
+
+        let request = ToolCommand::Extrude {
+            command: "select".to_string(),
+            amount
+        };
+
+        let res = self
+            .client
+            .post(&url)
+            .header("X-Api-Key", &self.api_key)
+            .json(&request)
+            .send()
+            .await
+            .map_err(|e| ToolCommandError::ReqwestError(e))?;
+
+        let status = res.status();
+
+        if status.is_success() {
+            return Ok(());
+        }
+        if status.is_server_error() {
+            return Err(ToolCommandError::ServerError);
+        }
+
+        let text = res
+            .text()
+            .await
+            .map_err(|e| ToolCommandError::ReqwestError(e))?;
+
+        match status {
+            StatusCode::BAD_REQUEST => Err(ToolCommandError::BadRequest(text)),
+            StatusCode::CONFLICT => Err(ToolCommandError::Conflict(text)),
+            _ => unreachable!(),
+        }
+    }
+
+    /// Extrudes using the selected tool.
+    /// use [`select_tool()`](#method.select_tool) to select a tool.
+    ///
+    /// Internally this calls the extrude method with `-amount` as the argument
+    pub async fn retract(&self, amount: f32) -> Result<(), ToolCommandError> {
+        self.extrude(-amount).await
+    }
+
+    /// Changes the flowrate of the selected tool.
+    /// use [`select_tool()`](#method.select_tool) to select a tool.
+    ///
+    /// The factor will always be relative to `1.0` so the flowrate will be set to the factor.
+    pub async fn change_tool_flowrate(&self, factor: f32) -> Result<(), ToolCommandError> {
+        let url = format!("http://{}:{}/api/printer/tool", &self.address, &self.port);
+
+        let request = ToolCommand::Flowrate { 
+            command: "select".to_string(),
+            factor
+        };
+
+        let res = self
+            .client
+            .post(&url)
+            .header("X-Api-Key", &self.api_key)
+            .json(&request)
+            .send()
+            .await
+            .map_err(|e| ToolCommandError::ReqwestError(e))?;
+
+        let status = res.status();
+
+        if status.is_success() {
+            return Ok(());
+        }
+        if status.is_server_error() {
+            return Err(ToolCommandError::ServerError);
+        }
+
+        let text = res
+            .text()
+            .await
+            .map_err(|e| ToolCommandError::ReqwestError(e))?;
+
+        match status {
+            StatusCode::BAD_REQUEST => Err(ToolCommandError::BadRequest(text)),
+            StatusCode::CONFLICT => Err(ToolCommandError::Conflict(text)),
+            _ => unreachable!(),
+        }
+    }
+
+    // 
+    //  NOTE: BED COMMANDS 
+    //
+
+    pub async fn change_bed_temp(&self, command: BedTempDescriptor) -> Result<(), ToolCommandError> {
+        let url = format!("http://{}:{}/api/printer/bed", &self.address, &self.port);
+
+        let res = self
+            .client
+            .post(&url)
+            .header("X-Api-Key", &self.api_key)
+            .json(&command.to_json())
+            .send()
+            .await
+            .map_err(|e| ToolCommandError::ReqwestError(e))?;
+
+        let status = res.status();
+
+        if status.is_success() {
+            return Ok(());
+        }
+        if status.is_server_error() {
+            return Err(ToolCommandError::ServerError);
+        }
+
+        let text = res
+            .text()
+            .await
+            .map_err(|e| ToolCommandError::ReqwestError(e))?;
+
+        match status {
+            StatusCode::BAD_REQUEST => Err(ToolCommandError::BadRequest(text)),
+            StatusCode::CONFLICT => Err(ToolCommandError::Conflict(text)),
+            _ => unreachable!(),
+        }
+    }
+    
+    pub async fn get_bed_state(&self, history: Option<u32>) -> Result<BedState, DeviceStateError> {
+        let query: String;
+        if let Some(x) = history {
+            query = format!("true&limit={}", x);
+        } else {
+            query = "false".to_string();
+        }
+
+        let url = format!(
+            "http://{}:{}/api/printer?history={}",
+            &self.address, &self.port, query
+        );
+
+        let res = self
+            .client
+            .get(&url)
+            .header("X-Api-Key", &self.api_key)
+            .send()
+            .await
+            .map_err(|e| DeviceStateError::ReqwestError(e))?;
+
+        let status = res.status();
+        let text = res
+            .text()
+            .await
+            .map_err(|e| DeviceStateError::ReqwestError(e))?;
+
+        match status {
+            StatusCode::CONFLICT => Err(DeviceStateError::Conflict(text)),
+            status if status.is_success() => {
+                let result = &mut serde_json::Deserializer::from_str(text.as_str());
+                let deserialized = serde_path_to_error::deserialize(result)
+                    .map_err(|e| DeviceStateError::ParseError(e.to_string()))?;
+                Ok(deserialized)
+            }
+            _ => unreachable!()
+        }
+    }
 }
