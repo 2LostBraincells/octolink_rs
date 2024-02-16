@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use octoprint_rs::types::{printer_files::Entry, ToolState, TemperatureHistoryEntry};
 
 #[test]

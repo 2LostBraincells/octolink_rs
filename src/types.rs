@@ -602,6 +602,13 @@ impl ToolTempDescriptor {
 // NOTE: TOOL STATE
 //
 
+/// A struct that represents the state of the printer's tools.
+///
+/// # Fields
+///
+/// * `tools`: A hashmap of the tools names as the key and their states as the value.
+/// * `history`: An optional vector of temperature history entries. The history is only available
+/// if history was requested, otherwise it will be `None`.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ToolState {
     pub history: Option<Vec<TemperatureHistoryEntry>>,

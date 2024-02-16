@@ -1,5 +1,3 @@
-use std::os::unix::fs::FileTypeExt;
-
 use errors::*;
 use reqwest::{Client, StatusCode};
 use types::*;
@@ -68,7 +66,8 @@ impl Printer {
 
         dbg!(&url);
 
-        let res = self .client
+        let res = self
+            .client
             .get(&url)
             .header("X-Api-Key", &self.api_key)
             .send()
@@ -133,14 +132,14 @@ impl Printer {
             .send()
             .await;
 
-        let body = res.map_err(|e| SetConnectionError::ReqwestError(e))?;
+        let body = res.map_err(SetConnectionError::ReqwestError)?;
         if body.status().is_success() {
             Ok(())
         } else {
             let text = body
                 .text()
                 .await
-                .map_err(|e| SetConnectionError::ReqwestError(e))?;
+                .map_err(SetConnectionError::ReqwestError)?;
             Err(SetConnectionError::BadRequest(text))
         }
     }
@@ -195,7 +194,7 @@ impl Printer {
             .send()
             .await;
 
-        let body = res.map_err(|e| FileRequestError::ReqwestError(e))?;
+        let body = res.map_err(FileRequestError::ReqwestError)?;
         let status = body.status();
 
         if status.is_server_error() {
@@ -205,7 +204,7 @@ impl Printer {
         let text = body
             .text()
             .await
-            .map_err(|e| FileRequestError::ReqwestError(e))?;
+            .map_err(FileRequestError::ReqwestError)?;
 
         if status.is_success() {
             let result = &mut serde_json::Deserializer::from_str(text.as_str());
@@ -272,13 +271,13 @@ impl Printer {
             .send()
             .await;
 
-        let body = res.map_err(|e| FileRequestError::ReqwestError(e))?;
+        let body = res.map_err(FileRequestError::ReqwestError)?;
         let status = body.status();
 
         let text = body
             .text()
             .await
-            .map_err(|e| FileRequestError::ReqwestError(e))?;
+            .map_err(FileRequestError::ReqwestError)?;
         match status {
             StatusCode::NOT_FOUND => Err(FileRequestError::NotFound(text)),
             StatusCode::INTERNAL_SERVER_ERROR => Err(FileRequestError::ServerError),
@@ -359,7 +358,7 @@ impl Printer {
             .send()
             .await;
 
-        let body = res.map_err(|e| FileCommandError::ReqwestError(e))?;
+        let body = res.map_err(FileCommandError::ReqwestError)?;
         let status = body.status();
 
         // Handle success case
@@ -371,7 +370,7 @@ impl Printer {
         let text = body
             .text()
             .await
-            .map_err(|e| FileCommandError::ReqwestError(e))?;
+            .map_err(FileCommandError::ReqwestError)?;
         match status {
             StatusCode::INTERNAL_SERVER_ERROR | StatusCode::BAD_REQUEST => {
                 Err(FileCommandError::BadRequest(text))
@@ -402,7 +401,7 @@ impl Printer {
             .send()
             .await;
 
-        let body = res.map_err(|e| FileDeletionError::ReqwestError(e))?;
+        let body = res.map_err(FileDeletionError::ReqwestError)?;
         let status = body.status();
 
         // Handle success case
@@ -414,7 +413,7 @@ impl Printer {
         let text = body
             .text()
             .await
-            .map_err(|e| FileDeletionError::ReqwestError(e))?;
+            .map_err(FileDeletionError::ReqwestError)?;
         match status {
             StatusCode::NOT_FOUND => Err(FileDeletionError::NotFound(text)),
             StatusCode::CONFLICT => Err(FileDeletionError::Conflict(text)),
@@ -451,7 +450,7 @@ impl Printer {
             .send()
             .await;
 
-        let body = res.map_err(|e| JobCommandError::ReqwestError(e))?;
+        let body = res.map_err(JobCommandError::ReqwestError)?;
         match body.status() {
             StatusCode::NO_CONTENT => Ok(()),
             StatusCode::INTERNAL_SERVER_ERROR => Err(JobCommandError::ServerError),
@@ -459,7 +458,7 @@ impl Printer {
                 let text = body
                     .text()
                     .await
-                    .map_err(|e| JobCommandError::ReqwestError(e))?;
+                    .map_err(JobCommandError::ReqwestError)?;
                 Err(JobCommandError::Conflict(text))
             }
             _ => unreachable!(),
@@ -503,7 +502,7 @@ impl Printer {
             .send()
             .await;
 
-        let body = res.map_err(|e| InformationRequestError::ReqwestError(e))?;
+        let body = res.map_err(InformationRequestError::ReqwestError)?;
         if body.status().is_server_error() {
             return Err(InformationRequestError::ServerError);
         }
@@ -511,16 +510,16 @@ impl Printer {
         let text = body
             .text()
             .await
-            .map_err(|e| InformationRequestError::ReqwestError(e))?;
+            .map_err(InformationRequestError::ReqwestError)?;
         let result = &mut serde_json::Deserializer::from_str(text.as_str());
         let deserialized = serde_path_to_error::deserialize(result)
             .map_err(|e| InformationRequestError::ParseError(e.to_string()))?;
         Ok(deserialized)
     }
 
-    // 
+    //
     //  NOTE: PRINTER COMMANDS
-    //  
+    //
 
     /// Gets the current printer telemetry.
     ///
@@ -561,12 +560,12 @@ impl Printer {
             .send()
             .await;
 
-        let body = res.map_err(|e| DeviceStateError::ReqwestError(e))?;
+        let body = res.map_err(DeviceStateError::ReqwestError)?;
         let status = body.status();
         let text = body
             .text()
             .await
-            .map_err(|e| DeviceStateError::ReqwestError(e))?;
+            .map_err(DeviceStateError::ReqwestError)?;
         match status {
             StatusCode::INTERNAL_SERVER_ERROR => Err(DeviceStateError::ServerError),
             StatusCode::CONFLICT => Err(DeviceStateError::Conflict(text)),
@@ -579,7 +578,7 @@ impl Printer {
         }
     }
 
-    // 
+    //
     //  NOTE: PRINTHEAD COMMANDS
     //
 
@@ -622,7 +621,7 @@ impl Printer {
             .json(&command.to_post())
             .send()
             .await
-            .map_err(|e| ToolCommandError::ReqwestError(e))?;
+            .map_err(ToolCommandError::ReqwestError)?;
 
         match res.status() {
             StatusCode::NO_CONTENT => Ok(()),
@@ -631,7 +630,7 @@ impl Printer {
                 let text = res
                     .text()
                     .await
-                    .map_err(|e| ToolCommandError::ReqwestError(e))?;
+                    .map_err(ToolCommandError::ReqwestError)?;
                 Err(match status {
                     StatusCode::BAD_REQUEST => ToolCommandError::BadRequest(text),
                     StatusCode::CONFLICT => ToolCommandError::Conflict(text),
@@ -659,7 +658,7 @@ impl Printer {
     /// * `Conflict` - If the server responds with a `409` StatusCode. This means the printer is
     /// currently printing
     pub async fn change_printhead_feedrate(&self, factor: f32) -> Result<(), ToolCommandError> {
-        if factor < 0.5 || factor > 2.0 {
+        if !(0.5..=2.0).contains(&factor) {
             return Err(ToolCommandError::BadRequest(
                 "Feedrate factor must be between 0.5 and 2.0".to_string(),
             ));
@@ -677,7 +676,7 @@ impl Printer {
             .json(&types::PrintheadCommand::from_feedrate(factor))
             .send()
             .await
-            .map_err(|e| ToolCommandError::ReqwestError(e))?;
+            .map_err(ToolCommandError::ReqwestError)?;
 
         match res.status() {
             StatusCode::NO_CONTENT => Ok(()),
@@ -686,7 +685,7 @@ impl Printer {
                 let text = res
                     .text()
                     .await
-                    .map_err(|e| ToolCommandError::ReqwestError(e))?;
+                    .map_err(ToolCommandError::ReqwestError)?;
                 Err(match status {
                     StatusCode::BAD_REQUEST => ToolCommandError::BadRequest(text),
                     StatusCode::CONFLICT => ToolCommandError::Conflict(text),
@@ -710,6 +709,9 @@ impl Printer {
     /// This function takes in a [`ToolTempDescriptor`](types::ToolTempDescriptor) which has two
     /// variants, `Target` and `Offset`,
     ///
+    /// Both of these variants have a `tool` field which is the target tool. This can be gotten by 
+    /// running [`get_tool_state()`](#method.get_tool_state).
+    ///
     /// `Offset` has two fields:
     /// * `tool` - The target tool.
     /// * `offset` - The amount to offset the temperature by
@@ -717,6 +719,16 @@ impl Printer {
     /// `Target` has two fields:
     /// * `tool` - The target tool.
     /// * `target` - The target temperature.
+    ///
+    /// # Errors 
+    /// 
+    /// If there is an error, it will return a [`ToolCommandError`](errors::ToolCommandError) enum.
+    /// * `ReqwestError` - If the request fails.
+    /// * `BadRequest` - If the server responds with a `400` StatusCode. This usually means you
+    /// didnt give it a valid tool. Run [`get_tool_state()`](#method.get_tool_state) to get the
+    /// valid tools.
+    /// * `Conflict` - If the server responds with a `409` StatusCode. This usually means there was a
+    /// conflict and the printer is currently printing.
     pub async fn tool_temperature(
         &self,
         command: ToolTempDescriptor,
@@ -730,7 +742,7 @@ impl Printer {
             .json(&command.to_json())
             .send()
             .await
-            .map_err(|e| ToolCommandError::ReqwestError(e))?;
+            .map_err(ToolCommandError::ReqwestError)?;
 
         let status = res.status();
 
@@ -744,7 +756,7 @@ impl Printer {
         let text = res
             .text()
             .await
-            .map_err(|e| ToolCommandError::ReqwestError(e))?;
+            .map_err(ToolCommandError::ReqwestError)?;
 
         match status {
             StatusCode::BAD_REQUEST => Err(ToolCommandError::BadRequest(text)),
@@ -753,6 +765,21 @@ impl Printer {
         }
     }
 
+    /// Gets the current state of all the tools on the printer.
+    ///
+    /// # Arguments
+    ///
+    /// `history` - An optional `u32` representing the amount of history to get. If this is `None`,
+    /// it will not return any history.
+    ///
+    /// # Errors 
+    ///
+    /// If there is an error, it will return a [`DeviceStateError`](errors::DeviceStateError) enum.
+    /// * `ReqwestError` - If the request fails.
+    /// * `ParseError` - If the response can not be parsed. This usually means the wrapper is 
+    /// outdated and they changed something in the api. (cry about it)
+    /// * `Conflict` - If the server responds with a `409` StatusCode. This usually means the
+    /// printer is not operational or not connected.
     pub async fn get_tool_state(
         &self,
         history: Option<u32>,
@@ -775,13 +802,13 @@ impl Printer {
             .header("X-Api-Key", &self.api_key)
             .send()
             .await
-            .map_err(|e| DeviceStateError::ReqwestError(e))?;
+            .map_err(DeviceStateError::ReqwestError)?;
 
         let status = res.status();
         let text = res
             .text()
             .await
-            .map_err(|e| DeviceStateError::ReqwestError(e))?;
+            .map_err(DeviceStateError::ReqwestError)?;
 
         match status {
             StatusCode::CONFLICT => Err(DeviceStateError::Conflict(text)),
@@ -791,10 +818,27 @@ impl Printer {
                     .map_err(|e| DeviceStateError::ParseError(e.to_string()))?;
                 Ok(deserialized)
             }
-            _ => unreachable!()
+            _ => unreachable!(),
         }
     }
 
+    /// Will select a tool on the printer. The selected tool can then be used to extrude or
+    /// retract filament, for example.
+    ///
+    /// # Arguments
+    ///
+    /// `tool` - A `String` representing the tool to select. Available tools can be gotten by 
+    /// running [`get_tool_state()`](#method.get_tool_state).
+    ///
+    /// # Errors 
+    ///
+    /// If there is an error, it will return a [`ToolCommandError`](errors::ToolCommandError) enum.
+    /// * `ReqwestError` - If the request fails.
+    /// * `BadRequest` - If the server responds with a `400` StatusCode. This usually means you
+    /// specified an invalid tool. Run [`get_tool_state()`](#method.get_tool_state) to get the valid
+    /// tools.
+    /// * `Conflict` - If the server responds with a `409` StatusCode. This usually means the printer
+    /// is either currently printing or not operational.
     pub async fn select_tool(&self, tool: String) -> Result<(), ToolCommandError> {
         let url = format!("http://{}:{}/api/printer/tool", &self.address, &self.port);
 
@@ -810,7 +854,7 @@ impl Printer {
             .json(&request)
             .send()
             .await
-            .map_err(|e| ToolCommandError::ReqwestError(e))?;
+            .map_err(ToolCommandError::ReqwestError)?;
 
         let status = res.status();
 
@@ -824,7 +868,7 @@ impl Printer {
         let text = res
             .text()
             .await
-            .map_err(|e| ToolCommandError::ReqwestError(e))?;
+            .map_err(ToolCommandError::ReqwestError)?;
 
         match status {
             StatusCode::BAD_REQUEST => Err(ToolCommandError::BadRequest(text)),
@@ -834,15 +878,28 @@ impl Printer {
     }
 
     /// Extrudes using the selected tool.
-    /// use [`select_tool()`](#method.select_tool) to select a tool.
+    /// Use [`select_tool()`](#method.select_tool) to select a tool.
     ///
-    /// To retract the filament, usa a negative value for the amount.
+    /// # Arguments 
+    ///
+    /// `amount` - A `f32` representing the amount to extrude. If this is a negative number, it will
+    /// instead retract the filament.
+    ///
+    /// # Errors 
+    ///
+    /// If there is an error, it will return a [`ToolCommandError`](errors::ToolCommandError) enum.
+    /// * `ReqwestError` - If the request fails.
+    /// * `BadRequest` - If the server responds with a `400` StatusCode. This usually means you
+    /// specified an invalid tool. Run [`get_tool_state()`](#method.get_tool_state) to get the valid
+    /// tools.
+    /// * `Conflict` - If the server responds with a `409` StatusCode. This usually means the printer
+    /// is either currently printing or not operational.
     pub async fn extrude(&self, amount: f32) -> Result<(), ToolCommandError> {
         let url = format!("http://{}:{}/api/printer/tool", &self.address, &self.port);
 
         let request = ToolCommand::Extrude {
             command: "select".to_string(),
-            amount
+            amount,
         };
 
         let res = self
@@ -852,7 +909,7 @@ impl Printer {
             .json(&request)
             .send()
             .await
-            .map_err(|e| ToolCommandError::ReqwestError(e))?;
+            .map_err(ToolCommandError::ReqwestError)?;
 
         let status = res.status();
 
@@ -866,7 +923,7 @@ impl Printer {
         let text = res
             .text()
             .await
-            .map_err(|e| ToolCommandError::ReqwestError(e))?;
+            .map_err(ToolCommandError::ReqwestError)?;
 
         match status {
             StatusCode::BAD_REQUEST => Err(ToolCommandError::BadRequest(text)),
@@ -875,10 +932,10 @@ impl Printer {
         }
     }
 
-    /// Extrudes using the selected tool.
+    /// retracts filament from the selected tool.
     /// use [`select_tool()`](#method.select_tool) to select a tool.
     ///
-    /// Internally this calls the extrude method with `-amount` as the argument
+    /// Internally this calls the [`extrude()`](#method.extrude) method with `-amount` as the argument
     pub async fn retract(&self, amount: f32) -> Result<(), ToolCommandError> {
         self.extrude(-amount).await
     }
@@ -886,13 +943,26 @@ impl Printer {
     /// Changes the flowrate of the selected tool.
     /// use [`select_tool()`](#method.select_tool) to select a tool.
     ///
-    /// The factor will always be relative to `1.0` so the flowrate will be set to the factor.
+    /// # Arguments
+    ///
+    /// `factor` - A `f32` representing the factor to change the flowrate by. The factor will always 
+    /// be relative to `1.0` so the flowrate will be set to the factor. The supported range is `0.75`..`1.25`.
+    ///
+    /// # Errors 
+    ///
+    /// If there is an error, it will return a [`ToolCommandError`](errors::ToolCommandError) enum.
+    /// * `ReqwestError` - If the request fails.
+    /// * `BadRequest` - If the server responds with a `400` StatusCode. This usually means you
+    /// havent specified a valid tool or requested a factor outside of the supported range. Run 
+    /// [`get_tool_state()`](#method.get_tool_state) to get the valid tools.
+    /// * `Conflict` - If the server responds with a `409` StatusCode. This usually means the printer
+    /// is either currently printing or not operational.
     pub async fn change_tool_flowrate(&self, factor: f32) -> Result<(), ToolCommandError> {
         let url = format!("http://{}:{}/api/printer/tool", &self.address, &self.port);
 
-        let request = ToolCommand::Flowrate { 
+        let request = ToolCommand::Flowrate {
             command: "select".to_string(),
-            factor
+            factor,
         };
 
         let res = self
@@ -902,7 +972,7 @@ impl Printer {
             .json(&request)
             .send()
             .await
-            .map_err(|e| ToolCommandError::ReqwestError(e))?;
+            .map_err(ToolCommandError::ReqwestError)?;
 
         let status = res.status();
 
@@ -916,7 +986,7 @@ impl Printer {
         let text = res
             .text()
             .await
-            .map_err(|e| ToolCommandError::ReqwestError(e))?;
+            .map_err(ToolCommandError::ReqwestError)?;
 
         match status {
             StatusCode::BAD_REQUEST => Err(ToolCommandError::BadRequest(text)),
@@ -925,11 +995,14 @@ impl Printer {
         }
     }
 
-    // 
-    //  NOTE: BED COMMANDS 
+    //
+    //  NOTE: BED COMMANDS
     //
 
-    pub async fn change_bed_temp(&self, command: BedTempDescriptor) -> Result<(), ToolCommandError> {
+    pub async fn change_bed_temp(
+        &self,
+        command: BedTempDescriptor,
+    ) -> Result<(), ToolCommandError> {
         let url = format!("http://{}:{}/api/printer/bed", &self.address, &self.port);
 
         let res = self
@@ -939,7 +1012,7 @@ impl Printer {
             .json(&command.to_json())
             .send()
             .await
-            .map_err(|e| ToolCommandError::ReqwestError(e))?;
+            .map_err(ToolCommandError::ReqwestError)?;
 
         let status = res.status();
 
@@ -950,10 +1023,7 @@ impl Printer {
             return Err(ToolCommandError::ServerError);
         }
 
-        let text = res
-            .text()
-            .await
-            .map_err(|e| ToolCommandError::ReqwestError(e))?;
+        let text = res.text().await.map_err(ToolCommandError::ReqwestError)?;
 
         match status {
             StatusCode::BAD_REQUEST => Err(ToolCommandError::BadRequest(text)),
@@ -961,7 +1031,7 @@ impl Printer {
             _ => unreachable!(),
         }
     }
-    
+
     pub async fn get_bed_state(&self, history: Option<u32>) -> Result<BedState, DeviceStateError> {
         let query: String;
         if let Some(x) = history {
@@ -981,13 +1051,10 @@ impl Printer {
             .header("X-Api-Key", &self.api_key)
             .send()
             .await
-            .map_err(|e| DeviceStateError::ReqwestError(e))?;
+            .map_err(DeviceStateError::ReqwestError)?;
 
         let status = res.status();
-        let text = res
-            .text()
-            .await
-            .map_err(|e| DeviceStateError::ReqwestError(e))?;
+        let text = res.text().await.map_err(DeviceStateError::ReqwestError)?;
 
         match status {
             StatusCode::CONFLICT => Err(DeviceStateError::Conflict(text)),
@@ -997,7 +1064,7 @@ impl Printer {
                     .map_err(|e| DeviceStateError::ParseError(e.to_string()))?;
                 Ok(deserialized)
             }
-            _ => unreachable!()
+            _ => unreachable!(),
         }
     }
 }

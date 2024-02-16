@@ -4,15 +4,13 @@ use tokio::test;
 mod mocks;
 use mocks::*;
 
-use octoprint_rs::errors::{FileRequestError, InformationRequestError, SetConnectionError};
-
 #[test]
 async fn get_api_version() {
     #[allow(unused)]
     let mock = mock_get_api_version();
 
     let printer_builder = PrinterBuilder::new(mock.address, mock.api_key).port(mock.port);
-    let mut printer = printer_builder.build();
+    let printer = printer_builder.build();
 
     let api_version = printer.get_api_version().await.unwrap();
 
@@ -27,11 +25,11 @@ async fn get_api_version() {
 async fn get_connection() {
     let mock = mock_get_api_connection();
 
-    let mut printer = PrinterBuilder::new(mock.address, mock.api_key)
+    let printer = PrinterBuilder::new(mock.address, mock.api_key)
         .port(mock.port)
         .build();
 
-    let printer_connection = printer.get_connection().await.unwrap();
+    let _ = printer.get_connection().await.unwrap();
 
     mock.mock.unwrap().assert();
 }
@@ -40,7 +38,7 @@ async fn get_connection() {
 async fn set_connection() {
     let mut mock = mock_post_api_connection();
 
-    let mut printer = PrinterBuilder::new(mock.address, mock.api_key)
+    let printer = PrinterBuilder::new(mock.address, mock.api_key)
         .port(mock.port)
         .build();
 
@@ -66,9 +64,9 @@ async fn set_connection() {
 
 #[test]
 async fn get_location() {
-    let mut mock = mock_get_api_files();
+    let mock = mock_get_api_files();
 
-    let mut printer = PrinterBuilder::new(mock.address, mock.api_key)
+    let printer = PrinterBuilder::new(mock.address, mock.api_key)
         .port(mock.port)
         .build();
 
@@ -90,7 +88,7 @@ async fn get_location() {
 async fn get_location_recursive() {
     let mock = mock_get_api_files_q_recursive();
 
-    let mut printer = PrinterBuilder::new(mock.address, mock.api_key)
+    let printer = PrinterBuilder::new(mock.address, mock.api_key)
         .port(mock.port)
         .build();
 
